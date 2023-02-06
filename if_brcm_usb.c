@@ -1,4 +1,4 @@
-/* $OpenBSD: if_bwfm_usb.c,v 1.20 2021/11/05 11:38:51 mpi Exp $ */
+/* $OpenBSD: if_brcm_usb.c,v 1.20 2021/11/05 11:38:51 mpi Exp $ */
 /*
  * Copyright (c) 2010-2016 Broadcom Corporation
  * Copyright (c) 2016,2017 Patrick Wildt <patrick@blueri.se>
@@ -48,13 +48,13 @@
 #include <dev/usb/usb_mem.h>
 #include <dev/usb/usbdevs.h>
 
-#include "bwfmvar.h"
-#include "bwfmreg.h"
+#include "brcmvar.h"
+#include "brcmreg.h"
 
 /*
  * Various supported device vendors/products.
  */
-static const struct usb_devno bwfm_usbdevs[] = {
+static const struct usb_devno brcm_usbdevs[] = {
 	{ USB_VENDOR_BROADCOM,	USB_PRODUCT_BROADCOM_BCM43143 },
 	{ USB_VENDOR_BROADCOM,	USB_PRODUCT_BROADCOM_BCM43236 },
 	{ USB_VENDOR_BROADCOM,	USB_PRODUCT_BROADCOM_BCM43242 },
@@ -62,10 +62,10 @@ static const struct usb_devno bwfm_usbdevs[] = {
 	{ USB_VENDOR_BROADCOM,	USB_PRODUCT_BROADCOM_BCMFW },
 };
 
-#ifdef BWFM_DEBUG
-#define DPRINTF(x)	do { if (bwfm_debug > 0) printf x; } while (0)
-#define DPRINTFN(n, x)	do { if (bwfm_debug >= (n)) printf x; } while (0)
-static int bwfm_debug = 2;
+#ifdef BRCM_DEBUG
+#define DPRINTF(x)	do { if (brcm_debug > 0) printf x; } while (0)
+#define DPRINTFN(n, x)	do { if (brcm_debug >= (n)) printf x; } while (0)
+static int brcm_debug = 2;
 #else
 #define DPRINTF(x)	do { ; } while (0)
 #define DPRINTFN(n, x)	do { ; } while (0)
@@ -142,26 +142,26 @@ struct bootrom_id {
 	uint32_t	boardrev;	/* Board revision */
 };
 
-struct bwfm_usb_rx_data {
-	struct bwfm_usb_softc		*sc;
+struct brcm_usb_rx_data {
+	struct brcm_usb_softc		*sc;
 	struct usbd_xfer		*xfer;
 	uint8_t				*buf;
 };
 
-struct bwfm_usb_tx_data {
-	struct bwfm_usb_softc		*sc;
+struct brcm_usb_tx_data {
+	struct brcm_usb_softc		*sc;
 	struct usbd_xfer		*xfer;
 	uint8_t				*buf;
 	struct mbuf			*mbuf;
-	TAILQ_ENTRY(bwfm_usb_tx_data)	 next;
+	TAILQ_ENTRY(brcm_usb_tx_data)	 next;
 };
 
-#define BWFM_RX_LIST_COUNT		50
-#define BWFM_TX_LIST_COUNT		50
-#define BWFM_RXBUFSZ			1600
-#define BWFM_TXBUFSZ			1600
-struct bwfm_usb_softc {
-	struct bwfm_softc	 sc_sc;
+#define BRCM_RX_LIST_COUNT		50
+#define BRCM_TX_LIST_COUNT		50
+#define BRCM_RXBUFSZ			1600
+#define BRCM_TXBUFSZ			1600
+struct brcm_usb_softc {
+	struct brcm_softc	 sc_sc;
 	struct usbd_device	*sc_udev;
 	struct usbd_interface	*sc_iface;
 	uint8_t			 sc_ifaceno;
@@ -180,65 +180,65 @@ struct bwfm_usb_softc {
 	struct usbd_pipe	*sc_rx_pipeh;
 	struct usbd_pipe	*sc_tx_pipeh;
 
-	struct bwfm_usb_rx_data	 sc_rx_data[BWFM_RX_LIST_COUNT];
-	struct bwfm_usb_tx_data	 sc_tx_data[BWFM_TX_LIST_COUNT];
-	TAILQ_HEAD(, bwfm_usb_tx_data) sc_tx_free_list;
+	struct brcm_usb_rx_data	 sc_rx_data[BRCM_RX_LIST_COUNT];
+	struct brcm_usb_tx_data	 sc_tx_data[BRCM_TX_LIST_COUNT];
+	TAILQ_HEAD(, brcm_usb_tx_data) sc_tx_free_list;
 };
 
-int		 bwfm_usb_match(struct device *, void *, void *);
-void		 bwfm_usb_attach(struct device *, struct device *, void *);
-int		 bwfm_usb_detach(struct device *, int);
+int		 brcm_usb_match(struct device *, void *, void *);
+void		 brcm_usb_attach(struct device *, struct device *, void *);
+int		 brcm_usb_detach(struct device *, int);
 
-int		 bwfm_usb_dl_cmd(struct bwfm_usb_softc *, uint8_t, void *, int);
-int		 bwfm_usb_load_microcode(struct bwfm_usb_softc *, const u_char *,
+int		 brcm_usb_dl_cmd(struct brcm_usb_softc *, uint8_t, void *, int);
+int		 brcm_usb_load_microcode(struct brcm_usb_softc *, const u_char *,
 		     size_t);
 
-int		 bwfm_usb_alloc_rx_list(struct bwfm_usb_softc *);
-void		 bwfm_usb_free_rx_list(struct bwfm_usb_softc *);
-int		 bwfm_usb_alloc_tx_list(struct bwfm_usb_softc *);
-void		 bwfm_usb_free_tx_list(struct bwfm_usb_softc *);
+int		 brcm_usb_alloc_rx_list(struct brcm_usb_softc *);
+void		 brcm_usb_free_rx_list(struct brcm_usb_softc *);
+int		 brcm_usb_alloc_tx_list(struct brcm_usb_softc *);
+void		 brcm_usb_free_tx_list(struct brcm_usb_softc *);
 
-int		 bwfm_usb_preinit(struct bwfm_softc *);
-int		 bwfm_usb_txcheck(struct bwfm_softc *);
-int		 bwfm_usb_txdata(struct bwfm_softc *, struct mbuf *);
-int		 bwfm_usb_txctl(struct bwfm_softc *, void *);
-void		 bwfm_usb_txctl_cb(struct usbd_xfer *, void *, usbd_status);
+int		 brcm_usb_preinit(struct brcm_softc *);
+int		 brcm_usb_txcheck(struct brcm_softc *);
+int		 brcm_usb_txdata(struct brcm_softc *, struct mbuf *);
+int		 brcm_usb_txctl(struct brcm_softc *, void *);
+void		 brcm_usb_txctl_cb(struct usbd_xfer *, void *, usbd_status);
 
-struct mbuf *	 bwfm_usb_newbuf(void);
-void		 bwfm_usb_rxeof(struct usbd_xfer *, void *, usbd_status);
-void		 bwfm_usb_txeof(struct usbd_xfer *, void *, usbd_status);
+struct mbuf *	 brcm_usb_newbuf(void);
+void		 brcm_usb_rxeof(struct usbd_xfer *, void *, usbd_status);
+void		 brcm_usb_txeof(struct usbd_xfer *, void *, usbd_status);
 
-struct bwfm_bus_ops bwfm_usb_bus_ops = {
-	.bs_preinit = bwfm_usb_preinit,
+struct brcm_bus_ops brcm_usb_bus_ops = {
+	.bs_preinit = brcm_usb_preinit,
 	.bs_stop = NULL,
-	.bs_txcheck = bwfm_usb_txcheck,
-	.bs_txdata = bwfm_usb_txdata,
-	.bs_txctl = bwfm_usb_txctl,
+	.bs_txcheck = brcm_usb_txcheck,
+	.bs_txdata = brcm_usb_txdata,
+	.bs_txctl = brcm_usb_txctl,
 };
 
-const struct cfattach bwfm_usb_ca = {
-	sizeof(struct bwfm_usb_softc),
-	bwfm_usb_match,
-	bwfm_usb_attach,
-	bwfm_usb_detach,
+const struct cfattach brcm_usb_ca = {
+	sizeof(struct brcm_usb_softc),
+	brcm_usb_match,
+	brcm_usb_attach,
+	brcm_usb_detach,
 };
 
 int
-bwfm_usb_match(struct device *parent, void *match, void *aux)
+brcm_usb_match(struct device *parent, void *match, void *aux)
 {
 	struct usb_attach_arg *uaa = aux;
 
 	if (uaa->iface == NULL || uaa->configno != 1)
 		return UMATCH_NONE;
 
-	return (usb_lookup(bwfm_usbdevs, uaa->vendor, uaa->product) != NULL) ?
+	return (usb_lookup(brcm_usbdevs, uaa->vendor, uaa->product) != NULL) ?
 	    UMATCH_VENDOR_PRODUCT_CONF_IFACE : UMATCH_NONE;
 }
 
 void
-bwfm_usb_attach(struct device *parent, struct device *self, void *aux)
+brcm_usb_attach(struct device *parent, struct device *self, void *aux)
 {
-	struct bwfm_usb_softc *sc = (struct bwfm_usb_softc *)self;
+	struct brcm_usb_softc *sc = (struct brcm_usb_softc *)self;
 	struct usb_attach_arg *uaa = aux;
 	usb_device_descriptor_t *dd;
 	usb_interface_descriptor_t *id;
@@ -250,8 +250,8 @@ bwfm_usb_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_ifaceno = uaa->ifaceno;
 	sc->sc_vendor = uaa->vendor;
 	sc->sc_product = uaa->product;
-	sc->sc_sc.sc_bus_ops = &bwfm_usb_bus_ops;
-	sc->sc_sc.sc_proto_ops = &bwfm_proto_bcdc_ops;
+	sc->sc_sc.sc_bus_ops = &brcm_usb_bus_ops;
+	sc->sc_sc.sc_proto_ops = &brcm_proto_bcdc_ops;
 
 	/* Check number of configurations. */
 	dd = usbd_get_device_descriptor(sc->sc_udev);
@@ -287,15 +287,15 @@ bwfm_usb_attach(struct device *parent, struct device *self, void *aux)
 		return;
 	}
 
-	bwfm_attach(&sc->sc_sc);
-	config_mountroot(self, bwfm_attachhook);
+	brcm_attach(&sc->sc_sc);
+	config_mountroot(self, brcm_attachhook);
 }
 
 int
-bwfm_usb_preinit(struct bwfm_softc *bwfm)
+brcm_usb_preinit(struct brcm_softc *brcm)
 {
-	struct bwfm_usb_softc *sc = (void *)bwfm;
-	struct bwfm_usb_rx_data *data;
+	struct brcm_usb_softc *sc = (void *)brcm;
+	struct brcm_usb_rx_data *data;
 	const char *name = NULL;
 	struct bootrom_id brom;
 	usbd_status error;
@@ -308,7 +308,7 @@ bwfm_usb_preinit(struct bwfm_softc *bwfm)
 
 	/* Read chip id and chip rev to check the firmware. */
 	memset(&brom, 0, sizeof(brom));
-	bwfm_usb_dl_cmd(sc, DL_GETVER, &brom, sizeof(brom));
+	brcm_usb_dl_cmd(sc, DL_GETVER, &brom, sizeof(brom));
 	sc->sc_chip = letoh32(brom.chip);
 	sc->sc_chiprev = letoh32(brom.chiprev);
 
@@ -363,7 +363,7 @@ bwfm_usb_preinit(struct bwfm_softc *bwfm)
 			goto cleanup;
 		}
 
-		if (bwfm_usb_load_microcode(sc, ucode, size) != 0) {
+		if (brcm_usb_load_microcode(sc, ucode, size) != 0) {
 			printf("%s: could not load microcode\n",
 			    DEVNAME(sc));
 			free(ucode, M_DEVBUF, size);
@@ -375,7 +375,7 @@ bwfm_usb_preinit(struct bwfm_softc *bwfm)
 		for (i = 0; i < 10; i++) {
 			delay(100 * 1000);
 			memset(&brom, 0, sizeof(brom));
-			bwfm_usb_dl_cmd(sc, DL_GETVER, &brom, sizeof(brom));
+			brcm_usb_dl_cmd(sc, DL_GETVER, &brom, sizeof(brom));
 			if (letoh32(brom.chip) == BRCMF_POSTBOOT_ID)
 				break;
 		}
@@ -390,19 +390,19 @@ bwfm_usb_preinit(struct bwfm_softc *bwfm)
 		sc->sc_chiprev = letoh32(brom.chiprev);
 	}
 
-	bwfm_usb_dl_cmd(sc, DL_RESETCFG, &brom, sizeof(brom));
+	brcm_usb_dl_cmd(sc, DL_RESETCFG, &brom, sizeof(brom));
 
-	if (bwfm_usb_alloc_rx_list(sc) || bwfm_usb_alloc_tx_list(sc)) {
+	if (brcm_usb_alloc_rx_list(sc) || brcm_usb_alloc_tx_list(sc)) {
 		printf("%s: cannot allocate rx/tx lists\n", DEVNAME(sc));
 		goto cleanup;
 	}
 
-	for (i = 0; i < BWFM_RX_LIST_COUNT; i++) {
+	for (i = 0; i < BRCM_RX_LIST_COUNT; i++) {
 		data = &sc->sc_rx_data[i];
 
 		usbd_setup_xfer(data->xfer, sc->sc_rx_pipeh, data, data->buf,
-		    BWFM_RXBUFSZ, USBD_SHORT_XFER_OK | USBD_NO_COPY, USBD_NO_TIMEOUT,
-		    bwfm_usb_rxeof);
+		    BRCM_RXBUFSZ, USBD_SHORT_XFER_OK | USBD_NO_COPY, USBD_NO_TIMEOUT,
+		    brcm_usb_rxeof);
 		error = usbd_transfer(data->xfer);
 		if (error != 0 && error != USBD_IN_PROGRESS)
 			printf("%s: could not set up new transfer: %s\n",
@@ -421,13 +421,13 @@ cleanup:
 		usbd_close_pipe(sc->sc_tx_pipeh);
 		sc->sc_tx_pipeh = NULL;
 	}
-	bwfm_usb_free_rx_list(sc);
-	bwfm_usb_free_tx_list(sc);
+	brcm_usb_free_rx_list(sc);
+	brcm_usb_free_tx_list(sc);
 	return 1;
 }
 
 struct mbuf *
-bwfm_usb_newbuf(void)
+brcm_usb_newbuf(void)
 {
 	struct mbuf *m;
 
@@ -447,10 +447,10 @@ bwfm_usb_newbuf(void)
 }
 
 void
-bwfm_usb_rxeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
+brcm_usb_rxeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 {
-	struct bwfm_usb_rx_data *data = priv;
-	struct bwfm_usb_softc *sc = data->sc;
+	struct brcm_usb_rx_data *data = priv;
+	struct brcm_usb_softc *sc = data->sc;
 	struct mbuf_list ml = MBUF_LIST_INITIALIZER();
 	struct ifnet *ifp = &sc->sc_sc.sc_ic.ic_if;
 	usbd_status error;
@@ -471,7 +471,7 @@ bwfm_usb_rxeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 	}
 	usbd_get_xfer_status(xfer, NULL, NULL, &len, NULL);
 
-	m = bwfm_usb_newbuf();
+	m = brcm_usb_newbuf();
 	if (m == NULL)
 		goto resubmit;
 
@@ -482,8 +482,8 @@ bwfm_usb_rxeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 
 resubmit:
 	usbd_setup_xfer(data->xfer, sc->sc_rx_pipeh, data, data->buf,
-	    BWFM_RXBUFSZ, USBD_SHORT_XFER_OK | USBD_NO_COPY, USBD_NO_TIMEOUT,
-	    bwfm_usb_rxeof);
+	    BRCM_RXBUFSZ, USBD_SHORT_XFER_OK | USBD_NO_COPY, USBD_NO_TIMEOUT,
+	    brcm_usb_rxeof);
 	error = usbd_transfer(data->xfer);
 	if (error != 0 && error != USBD_IN_PROGRESS)
 		printf("%s: could not set up new transfer: %s\n",
@@ -491,12 +491,12 @@ resubmit:
 }
 
 int
-bwfm_usb_alloc_rx_list(struct bwfm_usb_softc *sc)
+brcm_usb_alloc_rx_list(struct brcm_usb_softc *sc)
 {
-	struct bwfm_usb_rx_data *data;
+	struct brcm_usb_rx_data *data;
 	int i, error = 0;
 
-	for (i = 0; i < BWFM_RX_LIST_COUNT; i++) {
+	for (i = 0; i < BRCM_RX_LIST_COUNT; i++) {
 		data = &sc->sc_rx_data[i];
 
 		data->sc = sc; /* Backpointer for callbacks. */
@@ -508,7 +508,7 @@ bwfm_usb_alloc_rx_list(struct bwfm_usb_softc *sc)
 			error = ENOMEM;
 			break;
 		}
-		data->buf = usbd_alloc_buffer(data->xfer, BWFM_RXBUFSZ);
+		data->buf = usbd_alloc_buffer(data->xfer, BRCM_RXBUFSZ);
 		if (data->buf == NULL) {
 			printf("%s: could not allocate xfer buffer\n",
 			    DEVNAME(sc));
@@ -517,17 +517,17 @@ bwfm_usb_alloc_rx_list(struct bwfm_usb_softc *sc)
 		}
 	}
 	if (error != 0)
-		bwfm_usb_free_rx_list(sc);
+		brcm_usb_free_rx_list(sc);
 	return (error);
 }
 
 void
-bwfm_usb_free_rx_list(struct bwfm_usb_softc *sc)
+brcm_usb_free_rx_list(struct brcm_usb_softc *sc)
 {
 	int i;
 
 	/* NB: Caller must abort pipe first. */
-	for (i = 0; i < BWFM_RX_LIST_COUNT; i++) {
+	for (i = 0; i < BRCM_RX_LIST_COUNT; i++) {
 		if (sc->sc_rx_data[i].xfer != NULL)
 			usbd_free_xfer(sc->sc_rx_data[i].xfer);
 		sc->sc_rx_data[i].xfer = NULL;
@@ -535,13 +535,13 @@ bwfm_usb_free_rx_list(struct bwfm_usb_softc *sc)
 }
 
 int
-bwfm_usb_alloc_tx_list(struct bwfm_usb_softc *sc)
+brcm_usb_alloc_tx_list(struct brcm_usb_softc *sc)
 {
-	struct bwfm_usb_tx_data *data;
+	struct brcm_usb_tx_data *data;
 	int i, error = 0;
 
 	TAILQ_INIT(&sc->sc_tx_free_list);
-	for (i = 0; i < BWFM_TX_LIST_COUNT; i++) {
+	for (i = 0; i < BRCM_TX_LIST_COUNT; i++) {
 		data = &sc->sc_tx_data[i];
 
 		data->sc = sc; /* Backpointer for callbacks. */
@@ -553,7 +553,7 @@ bwfm_usb_alloc_tx_list(struct bwfm_usb_softc *sc)
 			error = ENOMEM;
 			break;
 		}
-		data->buf = usbd_alloc_buffer(data->xfer, BWFM_TXBUFSZ);
+		data->buf = usbd_alloc_buffer(data->xfer, BRCM_TXBUFSZ);
 		if (data->buf == NULL) {
 			printf("%s: could not allocate xfer buffer\n",
 			    DEVNAME(sc));
@@ -564,17 +564,17 @@ bwfm_usb_alloc_tx_list(struct bwfm_usb_softc *sc)
 		TAILQ_INSERT_TAIL(&sc->sc_tx_free_list, data, next);
 	}
 	if (error != 0)
-		bwfm_usb_free_tx_list(sc);
+		brcm_usb_free_tx_list(sc);
 	return (error);
 }
 
 void
-bwfm_usb_free_tx_list(struct bwfm_usb_softc *sc)
+brcm_usb_free_tx_list(struct brcm_usb_softc *sc)
 {
 	int i;
 
 	/* NB: Caller must abort pipe first. */
-	for (i = 0; i < BWFM_TX_LIST_COUNT; i++) {
+	for (i = 0; i < BRCM_TX_LIST_COUNT; i++) {
 		if (sc->sc_tx_data[i].xfer != NULL)
 			usbd_free_xfer(sc->sc_tx_data[i].xfer);
 		sc->sc_tx_data[i].xfer = NULL;
@@ -582,10 +582,10 @@ bwfm_usb_free_tx_list(struct bwfm_usb_softc *sc)
 }
 
 void
-bwfm_usb_txeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
+brcm_usb_txeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 {
-	struct bwfm_usb_tx_data *data = priv;
-	struct bwfm_usb_softc *sc = data->sc;
+	struct brcm_usb_tx_data *data = priv;
+	struct brcm_usb_softc *sc = data->sc;
 	struct ifnet *ifp = &sc->sc_sc.sc_ic.ic_if;
 	int s;
 
@@ -618,25 +618,25 @@ bwfm_usb_txeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 }
 
 int
-bwfm_usb_detach(struct device *self, int flags)
+brcm_usb_detach(struct device *self, int flags)
 {
-	struct bwfm_usb_softc *sc = (struct bwfm_usb_softc *)self;
+	struct brcm_usb_softc *sc = (struct brcm_usb_softc *)self;
 
-	bwfm_detach(&sc->sc_sc, flags);
+	brcm_detach(&sc->sc_sc, flags);
 
 	if (sc->sc_rx_pipeh != NULL)
 		usbd_close_pipe(sc->sc_rx_pipeh);
 	if (sc->sc_tx_pipeh != NULL)
 		usbd_close_pipe(sc->sc_tx_pipeh);
 
-	bwfm_usb_free_rx_list(sc);
-	bwfm_usb_free_tx_list(sc);
+	brcm_usb_free_rx_list(sc);
+	brcm_usb_free_tx_list(sc);
 
 	return 0;
 }
 
 int
-bwfm_usb_dl_cmd(struct bwfm_usb_softc *sc, uByte cmd, void *buf, int len)
+brcm_usb_dl_cmd(struct brcm_usb_softc *sc, uByte cmd, void *buf, int len)
 {
 	usb_device_request_t req;
 	usbd_status error;
@@ -657,7 +657,7 @@ bwfm_usb_dl_cmd(struct bwfm_usb_softc *sc, uByte cmd, void *buf, int len)
 }
 
 int
-bwfm_usb_load_microcode(struct bwfm_usb_softc *sc, const u_char *ucode, size_t size)
+brcm_usb_load_microcode(struct brcm_usb_softc *sc, const u_char *ucode, size_t size)
 {
 	struct trx_header *trx = (struct trx_header *)ucode;
 	struct rdl_state state;
@@ -672,7 +672,7 @@ bwfm_usb_load_microcode(struct bwfm_usb_softc *sc, const u_char *ucode, size_t s
 		return 1;
 	}
 
-	bwfm_usb_dl_cmd(sc, DL_START, &state, sizeof(state));
+	brcm_usb_dl_cmd(sc, DL_START, &state, sizeof(state));
 	rdlstate = letoh32(state.state);
 	rdlbytes = letoh32(state.bytes);
 
@@ -706,7 +706,7 @@ bwfm_usb_load_microcode(struct bwfm_usb_softc *sc, const u_char *ucode, size_t s
 		}
 		sent += sendlen;
 
-		bwfm_usb_dl_cmd(sc, DL_GETSTATE, &state, sizeof(state));
+		brcm_usb_dl_cmd(sc, DL_GETSTATE, &state, sizeof(state));
 		rdlstate = letoh32(state.state);
 		rdlbytes = letoh32(state.bytes);
 
@@ -723,7 +723,7 @@ bwfm_usb_load_microcode(struct bwfm_usb_softc *sc, const u_char *ucode, size_t s
 		}
 	}
 
-	bwfm_usb_dl_cmd(sc, DL_GETSTATE, &state, sizeof(state));
+	brcm_usb_dl_cmd(sc, DL_GETSTATE, &state, sizeof(state));
 	rdlstate = letoh32(state.state);
 	rdlbytes = letoh32(state.bytes);
 
@@ -732,7 +732,7 @@ bwfm_usb_load_microcode(struct bwfm_usb_softc *sc, const u_char *ucode, size_t s
 		goto err;
 	}
 
-	bwfm_usb_dl_cmd(sc, DL_GO, &state, sizeof(state));
+	brcm_usb_dl_cmd(sc, DL_GO, &state, sizeof(state));
 
 	return 0;
 err:
@@ -746,9 +746,9 @@ err:
 }
 
 int
-bwfm_usb_txcheck(struct bwfm_softc *bwfm)
+brcm_usb_txcheck(struct brcm_softc *brcm)
 {
-	struct bwfm_usb_softc *sc = (void *)bwfm;
+	struct brcm_usb_softc *sc = (void *)brcm;
 
 	if (TAILQ_EMPTY(&sc->sc_tx_free_list))
 		return ENOBUFS;
@@ -757,11 +757,11 @@ bwfm_usb_txcheck(struct bwfm_softc *bwfm)
 }
 
 int
-bwfm_usb_txdata(struct bwfm_softc *bwfm, struct mbuf *m)
+brcm_usb_txdata(struct brcm_softc *brcm, struct mbuf *m)
 {
-	struct bwfm_usb_softc *sc = (void *)bwfm;
-	struct bwfm_proto_bcdc_hdr *hdr;
-	struct bwfm_usb_tx_data *data;
+	struct brcm_usb_softc *sc = (void *)brcm;
+	struct brcm_proto_bcdc_hdr *hdr;
+	struct brcm_usb_tx_data *data;
 	uint32_t len = 0;
 	int error;
 
@@ -777,7 +777,7 @@ bwfm_usb_txdata(struct bwfm_softc *bwfm, struct mbuf *m)
 	hdr = (void *)&data->buf[len];
 	hdr->data_offset = 0;
 	hdr->priority = ieee80211_classify(&sc->sc_sc.sc_ic, m);
-	hdr->flags = BWFM_BCDC_FLAG_VER(BWFM_BCDC_FLAG_PROTO_VER);
+	hdr->flags = BRCM_BCDC_FLAG_VER(BRCM_BCDC_FLAG_PROTO_VER);
 	hdr->flags2 = 0;
 	len += sizeof(*hdr);
 
@@ -788,7 +788,7 @@ bwfm_usb_txdata(struct bwfm_softc *bwfm, struct mbuf *m)
 
 	usbd_setup_xfer(data->xfer, sc->sc_tx_pipeh, data, data->buf,
 	    len, USBD_FORCE_SHORT_XFER | USBD_NO_COPY, USBD_NO_TIMEOUT,
-	    bwfm_usb_txeof);
+	    brcm_usb_txeof);
 	error = usbd_transfer(data->xfer);
 	if (error != 0 && error != USBD_IN_PROGRESS)
 		printf("%s: could not set up new transfer: %s\n",
@@ -797,10 +797,10 @@ bwfm_usb_txdata(struct bwfm_softc *bwfm, struct mbuf *m)
 }
 
 int
-bwfm_usb_txctl(struct bwfm_softc *bwfm, void *arg)
+brcm_usb_txctl(struct brcm_softc *brcm, void *arg)
 {
-	struct bwfm_usb_softc *sc = (void *)bwfm;
-	struct bwfm_proto_bcdc_ctl *ctl = arg;
+	struct brcm_usb_softc *sc = (void *)brcm;
+	struct brcm_proto_bcdc_ctl *ctl = arg;
 	usb_device_request_t req;
 	struct usbd_xfer *xfer;
 	usbd_status error;
@@ -844,7 +844,7 @@ bwfm_usb_txctl(struct bwfm_softc *bwfm, void *arg)
 	USETW(req.wIndex, sc->sc_ifaceno);
 	USETW(req.wLength, ctl->len);
 
-	error = usbd_request_async(xfer, &req, sc, bwfm_usb_txctl_cb);
+	error = usbd_request_async(xfer, &req, sc, brcm_usb_txctl_cb);
 	if (error != 0) {
 		printf("%s: could not read ctl packet: %s\n",
 		    DEVNAME(sc), usbd_errstr(error));
@@ -859,9 +859,9 @@ bwfm_usb_txctl(struct bwfm_softc *bwfm, void *arg)
 }
 
 void
-bwfm_usb_txctl_cb(struct usbd_xfer *xfer, void *priv, usbd_status err)
+brcm_usb_txctl_cb(struct usbd_xfer *xfer, void *priv, usbd_status err)
 {
-	struct bwfm_usb_softc *sc = priv;
+	struct brcm_usb_softc *sc = priv;
 
 	if (usbd_is_dying(xfer->pipe->device))
 		goto err;

@@ -61,22 +61,22 @@
 #define CY_CC_43012_CHIP_ID		43012
 #define CY_CC_43752_CHIP_ID		43752
 /* Defaults */
-#define BWFM_DEFAULT_SCAN_CHANNEL_TIME	40
-#define BWFM_DEFAULT_SCAN_UNASSOC_TIME	40
-#define BWFM_DEFAULT_SCAN_PASSIVE_TIME	120
+#define BRCM_DEFAULT_SCAN_CHANNEL_TIME	40
+#define BRCM_DEFAULT_SCAN_UNASSOC_TIME	40
+#define BRCM_DEFAULT_SCAN_PASSIVE_TIME	120
 
 
-struct bwfm_softc;
+struct brcm_softc;
 
-struct bwfm_core {
+struct brcm_core {
 	uint16_t	 co_id;
 	uint16_t	 co_rev;
 	uint32_t	 co_base;
 	uint32_t	 co_wrapbase;
-	LIST_ENTRY(bwfm_core) co_link;
+	LIST_ENTRY(brcm_core) co_link;
 };
 
-struct bwfm_chip {
+struct brcm_chip {
 	uint32_t	 ch_chip;
 	uint32_t	 ch_chiprev;
 	uint32_t	 ch_cc_caps;
@@ -87,89 +87,89 @@ struct bwfm_chip {
 	uint32_t	 ch_ramsize;
 	uint32_t	 ch_srsize;
 	char		 ch_name[8];
-	LIST_HEAD(,bwfm_core) ch_list;
-	int (*ch_core_isup)(struct bwfm_softc *, struct bwfm_core *);
-	void (*ch_core_disable)(struct bwfm_softc *, struct bwfm_core *,
+	LIST_HEAD(,brcm_core) ch_list;
+	int (*ch_core_isup)(struct brcm_softc *, struct brcm_core *);
+	void (*ch_core_disable)(struct brcm_softc *, struct brcm_core *,
 	    uint32_t prereset, uint32_t reset);
-	void (*ch_core_reset)(struct bwfm_softc *, struct bwfm_core *,
+	void (*ch_core_reset)(struct brcm_softc *, struct brcm_core *,
 	    uint32_t prereset, uint32_t reset, uint32_t postreset);
 };
 
-struct bwfm_bus_ops {
-	int (*bs_preinit)(struct bwfm_softc *);
-	void (*bs_stop)(struct bwfm_softc *);
-	int (*bs_txcheck)(struct bwfm_softc *);
-	int (*bs_txdata)(struct bwfm_softc *, struct mbuf *);
-	int (*bs_txctl)(struct bwfm_softc *, void *);
+struct brcm_bus_ops {
+	int (*bs_preinit)(struct brcm_softc *);
+	void (*bs_stop)(struct brcm_softc *);
+	int (*bs_txcheck)(struct brcm_softc *);
+	int (*bs_txdata)(struct brcm_softc *, struct mbuf *);
+	int (*bs_txctl)(struct brcm_softc *, void *);
 };
 
-struct bwfm_buscore_ops {
-	uint32_t (*bc_read)(struct bwfm_softc *, uint32_t);
-	void (*bc_write)(struct bwfm_softc *, uint32_t, uint32_t);
-	int (*bc_prepare)(struct bwfm_softc *);
-	int (*bc_reset)(struct bwfm_softc *);
-	int (*bc_setup)(struct bwfm_softc *);
-	void (*bc_activate)(struct bwfm_softc *, uint32_t);
+struct brcm_buscore_ops {
+	uint32_t (*bc_read)(struct brcm_softc *, uint32_t);
+	void (*bc_write)(struct brcm_softc *, uint32_t, uint32_t);
+	int (*bc_prepare)(struct brcm_softc *);
+	int (*bc_reset)(struct brcm_softc *);
+	int (*bc_setup)(struct brcm_softc *);
+	void (*bc_activate)(struct brcm_softc *, uint32_t);
 };
 
-struct bwfm_proto_ops {
-	int (*proto_query_dcmd)(struct bwfm_softc *, int, int,
+struct brcm_proto_ops {
+	int (*proto_query_dcmd)(struct brcm_softc *, int, int,
 	    char *, size_t *);
-	int (*proto_set_dcmd)(struct bwfm_softc *, int, int,
+	int (*proto_set_dcmd)(struct brcm_softc *, int, int,
 	    char *, size_t);
-	void (*proto_rx)(struct bwfm_softc *, struct mbuf *,
+	void (*proto_rx)(struct brcm_softc *, struct mbuf *,
 			 struct mbuf *);//struct mbuf_list *);
-	void (*proto_rxctl)(struct bwfm_softc *, char *, size_t);
+	void (*proto_rxctl)(struct brcm_softc *, char *, size_t);
 };
-extern struct bwfm_proto_ops bwfm_proto_bcdc_ops;
+extern struct brcm_proto_ops brcm_proto_bcdc_ops;
 
-struct bwfm_host_cmd {
-	void	 (*cb)(struct bwfm_softc *, void *);
+struct brcm_host_cmd {
+	void	 (*cb)(struct brcm_softc *, void *);
 	uint8_t	 data[256];
 };
 
-struct bwfm_cmd_key {
+struct brcm_cmd_key {
 	struct ieee80211_node	 *ni;
 	struct ieee80211_key	 *k;
 };
 
-struct bwfm_cmd_flowring_create {
+struct brcm_cmd_flowring_create {
 	struct mbuf		*m;
 	int			 flowid;
 	int			 prio;
 };
 
-struct bwfm_cmd_flowring_delete {
+struct brcm_cmd_flowring_delete {
 	int			 flowid;
 };
 
-struct bwfm_host_cmd_ring {
-#define BWFM_HOST_CMD_RING_COUNT	32
-	struct bwfm_host_cmd	 cmd[BWFM_HOST_CMD_RING_COUNT];
+struct brcm_host_cmd_ring {
+#define BRCM_HOST_CMD_RING_COUNT	32
+	struct brcm_host_cmd	 cmd[BRCM_HOST_CMD_RING_COUNT];
 	int			 cur;
 	int			 next;
 	int			 queued;
 };
 
-struct bwfm_proto_bcdc_ctl {
+struct brcm_proto_bcdc_ctl {
 	int				 reqid;
 	char				*buf;
 	size_t				 len;
 	int				 done;
-	TAILQ_ENTRY(bwfm_proto_bcdc_ctl) next;
+	TAILQ_ENTRY(brcm_proto_bcdc_ctl) next;
 };
 
-struct bwfm_softc {
+struct brcm_softc {
 	struct device		 sc_dev;
 	struct ieee80211com	 sc_ic;
 	struct ifmedia		 sc_media;
-	struct bwfm_bus_ops	*sc_bus_ops;
-	struct bwfm_buscore_ops	*sc_buscore_ops;
-	struct bwfm_proto_ops	*sc_proto_ops;
-	struct bwfm_chip	 sc_chip;
+	struct brcm_bus_ops	*sc_bus_ops;
+	struct brcm_buscore_ops	*sc_buscore_ops;
+	struct brcm_proto_ops	*sc_proto_ops;
+	struct brcm_chip	 sc_chip;
 	uint8_t			 sc_io_type;
-#define		BWFM_IO_TYPE_D11N		1
-#define		BWFM_IO_TYPE_D11AC		2
+#define		BRCM_IO_TYPE_D11N		1
+#define		BRCM_IO_TYPE_D11AC		2
 
 	int			 sc_node;
 	int			 sc_initialized;
@@ -179,13 +179,13 @@ struct bwfm_softc {
 
 	int			 (*sc_newstate)(struct ieee80211com *,
 				     enum ieee80211_state, int);
-	struct bwfm_host_cmd_ring sc_cmdq;
+	struct brcm_host_cmd_ring sc_cmdq;
 	struct taskq		*sc_taskq;
 	struct task		 sc_task;
 	struct mbuf_list	 sc_evml;
 
 	int			 sc_bcdc_reqid;
-	TAILQ_HEAD(, bwfm_proto_bcdc_ctl) sc_bcdc_rxctlq;
+	TAILQ_HEAD(, brcm_proto_bcdc_ctl) sc_bcdc_rxctlq;
 
 	char			 sc_fwdir[16];
 	u_char			*sc_clm;
@@ -202,21 +202,21 @@ struct bwfm_softc {
 	char			 sc_modrev[8];
 };
 
-void bwfm_attach(struct bwfm_softc *);
-void bwfm_attachhook(struct device *);
-int bwfm_preinit(struct bwfm_softc *);
-void bwfm_cleanup(struct bwfm_softc *);
-int bwfm_detach(struct bwfm_softc *, int);
-int bwfm_activate(struct bwfm_softc *, int);
-int bwfm_chip_attach(struct bwfm_softc *);
-int bwfm_chip_set_active(struct bwfm_softc *, uint32_t);
-void bwfm_chip_set_passive(struct bwfm_softc *);
-int bwfm_chip_sr_capable(struct bwfm_softc *);
-struct bwfm_core *bwfm_chip_get_core(struct bwfm_softc *, int);
-struct bwfm_core *bwfm_chip_get_pmu(struct bwfm_softc *);
-void bwfm_rx(struct bwfm_softc *, struct mbuf *, struct mbuf_list *);
-void bwfm_do_async(struct bwfm_softc *, void (*)(struct bwfm_softc *, void *),
+void brcm_attach(struct brcm_softc *);
+void brcm_attachhook(struct device *);
+int brcm_preinit(struct brcm_softc *);
+void brcm_cleanup(struct brcm_softc *);
+int brcm_detach(struct brcm_softc *, int);
+int brcm_activate(struct brcm_softc *, int);
+int brcm_chip_attach(struct brcm_softc *);
+int brcm_chip_set_active(struct brcm_softc *, uint32_t);
+void brcm_chip_set_passive(struct brcm_softc *);
+int brcm_chip_sr_capable(struct brcm_softc *);
+struct brcm_core *brcm_chip_get_core(struct brcm_softc *, int);
+struct brcm_core *brcm_chip_get_pmu(struct brcm_softc *);
+void brcm_rx(struct brcm_softc *, struct mbuf *, struct mbuf_list *);
+void brcm_do_async(struct brcm_softc *, void (*)(struct brcm_softc *, void *),
     void *, int);
-int bwfm_nvram_convert(int, u_char **, size_t *, size_t *);
-int bwfm_loadfirmware(struct bwfm_softc *, const char *, const char *,
+int brcm_nvram_convert(int, u_char **, size_t *, size_t *);
+int brcm_loadfirmware(struct brcm_softc *, const char *, const char *,
     u_char **, size_t *, u_char **, size_t *, size_t *);
