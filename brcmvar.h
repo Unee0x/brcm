@@ -1,4 +1,4 @@
-/* $OpenBSD: bwfmvar.h,v 1.31 2022/03/06 18:52:47 kettenis Exp $ */
+/* $OpenBSD: brcmvar.h,v 1.31 2022/03/06 18:52:47 kettenis Exp $ */
 /*
  * Copyright (c) 2010-2016 Broadcom Corporation
  * Copyright (c) 2016,2017 Patrick Wildt <patrick@blueri.se>

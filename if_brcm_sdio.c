@@ -1,4 +1,4 @@
-/* $OpenBSD: if_bwfm_sdio.c,v 1.44 2022/04/06 18:59:30 naddy Exp $ */
+/* $OpenBSD: if_brcm_sdio.c,v 1.44 2022/04/06 18:59:30 naddy Exp $ */
 /*
  * Copyright (c) 2010-2016 Broadcom Corporation
  * Copyright (c) 2016,2017 Patrick Wildt <patrick@blueri.se>
@@ -48,23 +48,23 @@
 #include <dev/sdmmc/sdmmcdevs.h>
 #include <dev/sdmmc/sdmmcvar.h>
 
-#include <dev/ic/bwfmvar.h>
-#include <dev/ic/bwfmreg.h>
-#include <dev/sdmmc/if_bwfm_sdio.h>
+#include <dev/ic/brcmvar.h>
+#include <dev/ic/brcmreg.h>
+#include <dev/sdmmc/if_brcm_sdio.h>
 
-#define BWFM_SDIO_CCCR_BRCM_CARDCAP			0xf0
-#define  BWFM_SDIO_CCCR_BRCM_CARDCAP_CMD14_SUPPORT	0x02
-#define  BWFM_SDIO_CCCR_BRCM_CARDCAP_CMD14_EXT		0x04
-#define  BWFM_SDIO_CCCR_BRCM_CARDCAP_CMD_NODEC		0x08
-#define BWFM_SDIO_CCCR_BRCM_CARDCTRL			0xf1
-#define  BWFM_SDIO_CCCR_BRCM_CARDCTRL_WLANRESET		0x02
-#define BWFM_SDIO_CCCR_BRCM_SEPINT			0xf2
+#define BRCM_SDIO_CCCR_BRCM_CARDCAP			0xf0
+#define  BRCM_SDIO_CCCR_BRCM_CARDCAP_CMD14_SUPPORT	0x02
+#define  BRCM_SDIO_CCCR_BRCM_CARDCAP_CMD14_EXT		0x04
+#define  BRCM_SDIO_CCCR_BRCM_CARDCAP_CMD_NODEC		0x08
+#define BRCM_SDIO_CCCR_BRCM_CARDCTRL			0xf1
+#define  BRCM_SDIO_CCCR_BRCM_CARDCTRL_WLANRESET		0x02
+#define BRCM_SDIO_CCCR_BRCM_SEPINT			0xf2
 
-/* #define BWFM_DEBUG */
-#ifdef BWFM_DEBUG
-#define DPRINTF(x)	do { if (bwfm_debug > 0) printf x; } while (0)
-#define DPRINTFN(n, x)	do { if (bwfm_debug >= (n)) printf x; } while (0)
-static int bwfm_debug = 1;
+/* #define BRCM_DEBUG */
+#ifdef BRCM_DEBUG
+#define DPRINTF(x)	do { if (brcm_debug > 0) printf x; } while (0)
+#define DPRINTFN(n, x)	do { if (brcm_debug >= (n)) printf x; } while (0)
+static int brcm_debug = 1;
 #else
 #define DPRINTF(x)	do { ; } while (0)
 #define DPRINTFN(n, x)	do { ; } while (0)
@@ -73,15 +73,15 @@ static int bwfm_debug = 1;
 #undef DEVNAME
 #define DEVNAME(sc)	((sc)->sc_sc.sc_dev.dv_xname)
 
-enum bwfm_sdio_clkstate {
+enum brcm_sdio_clkstate {
 	CLK_NONE,
 	CLK_SDONLY,
 	CLK_PENDING,
 	CLK_AVAIL,
 };
 
-struct bwfm_sdio_softc {
-	struct bwfm_softc	  sc_sc;
+struct brcm_sdio_softc {
+	struct brcm_softc	  sc_sc;
 	struct sdmmc_function	**sc_sf;
 	struct rwlock		 *sc_lock;
 	void			 *sc_ih;
@@ -102,7 +102,7 @@ struct bwfm_sdio_softc {
 	size_t			  sc_console_buf_size;
 	uint32_t		  sc_console_readidx;
 
-	struct bwfm_core	 *sc_cc;
+	struct brcm_core	 *sc_cc;
 
 	uint8_t			  sc_tx_seq;
 	uint8_t			  sc_tx_max_seq;
@@ -112,91 +112,91 @@ struct bwfm_sdio_softc {
 	struct task		  sc_task;
 };
 
-int		 bwfm_sdio_match(struct device *, void *, void *);
-void		 bwfm_sdio_attach(struct device *, struct device *, void *);
-int		 bwfm_sdio_preinit(struct bwfm_softc *);
-int		 bwfm_sdio_detach(struct device *, int);
+int		 brcm_sdio_match(struct device *, void *, void *);
+void		 brcm_sdio_attach(struct device *, struct device *, void *);
+int		 brcm_sdio_preinit(struct brcm_softc *);
+int		 brcm_sdio_detach(struct device *, int);
 
-int		 bwfm_sdio_intr(void *);
-int		 bwfm_sdio_oob_intr(void *);
-void		 bwfm_sdio_task(void *);
-int		 bwfm_sdio_load_microcode(struct bwfm_sdio_softc *,
+int		 brcm_sdio_intr(void *);
+int		 brcm_sdio_oob_intr(void *);
+void		 brcm_sdio_task(void *);
+int		 brcm_sdio_load_microcode(struct brcm_sdio_softc *,
 		    u_char *, size_t, u_char *, size_t);
 
-void		 bwfm_sdio_clkctl(struct bwfm_sdio_softc *,
-		    enum bwfm_sdio_clkstate, int);
-void		 bwfm_sdio_htclk(struct bwfm_sdio_softc *, int, int);
-void		 bwfm_sdio_readshared(struct bwfm_sdio_softc *);
+void		 brcm_sdio_clkctl(struct brcm_sdio_softc *,
+		    enum brcm_sdio_clkstate, int);
+void		 brcm_sdio_htclk(struct brcm_sdio_softc *, int, int);
+void		 brcm_sdio_readshared(struct brcm_sdio_softc *);
 
-void		 bwfm_sdio_backplane(struct bwfm_sdio_softc *, uint32_t);
-uint8_t		 bwfm_sdio_read_1(struct bwfm_sdio_softc *, uint32_t);
-uint32_t	 bwfm_sdio_read_4(struct bwfm_sdio_softc *, uint32_t);
-void		 bwfm_sdio_write_1(struct bwfm_sdio_softc *, uint32_t,
+void		 brcm_sdio_backplane(struct brcm_sdio_softc *, uint32_t);
+uint8_t		 brcm_sdio_read_1(struct brcm_sdio_softc *, uint32_t);
+uint32_t	 brcm_sdio_read_4(struct brcm_sdio_softc *, uint32_t);
+void		 brcm_sdio_write_1(struct brcm_sdio_softc *, uint32_t,
 		    uint8_t);
-void		 bwfm_sdio_write_4(struct bwfm_sdio_softc *, uint32_t,
+void		 brcm_sdio_write_4(struct brcm_sdio_softc *, uint32_t,
 		    uint32_t);
-int		 bwfm_sdio_buf_read(struct bwfm_sdio_softc *,
+int		 brcm_sdio_buf_read(struct brcm_sdio_softc *,
 		    struct sdmmc_function *, uint32_t, char *, size_t);
-int		 bwfm_sdio_buf_write(struct bwfm_sdio_softc *,
+int		 brcm_sdio_buf_write(struct brcm_sdio_softc *,
 		    struct sdmmc_function *, uint32_t, char *, size_t);
-uint32_t	 bwfm_sdio_ram_read_write(struct bwfm_sdio_softc *,
+uint32_t	 brcm_sdio_ram_read_write(struct brcm_sdio_softc *,
 		    uint32_t, char *, size_t, int);
-uint32_t	 bwfm_sdio_frame_read_write(struct bwfm_sdio_softc *,
+uint32_t	 brcm_sdio_frame_read_write(struct brcm_sdio_softc *,
 		    char *, size_t, int);
 
-uint32_t	 bwfm_sdio_dev_read(struct bwfm_sdio_softc *, uint32_t);
-void		 bwfm_sdio_dev_write(struct bwfm_sdio_softc *, uint32_t,
+uint32_t	 brcm_sdio_dev_read(struct brcm_sdio_softc *, uint32_t);
+void		 brcm_sdio_dev_write(struct brcm_sdio_softc *, uint32_t,
 		    uint32_t);
 
-uint32_t	 bwfm_sdio_buscore_read(struct bwfm_softc *, uint32_t);
-void		 bwfm_sdio_buscore_write(struct bwfm_softc *, uint32_t,
+uint32_t	 brcm_sdio_buscore_read(struct brcm_softc *, uint32_t);
+void		 brcm_sdio_buscore_write(struct brcm_softc *, uint32_t,
 		    uint32_t);
-int		 bwfm_sdio_buscore_prepare(struct bwfm_softc *);
-void		 bwfm_sdio_buscore_activate(struct bwfm_softc *, uint32_t);
+int		 brcm_sdio_buscore_prepare(struct brcm_softc *);
+void		 brcm_sdio_buscore_activate(struct brcm_softc *, uint32_t);
 
-struct mbuf *	 bwfm_sdio_newbuf(void);
-int		 bwfm_sdio_tx_ok(struct bwfm_sdio_softc *);
-void		 bwfm_sdio_tx_frames(struct bwfm_sdio_softc *);
-void		 bwfm_sdio_tx_ctrlframe(struct bwfm_sdio_softc *, struct mbuf *);
-void		 bwfm_sdio_tx_dataframe(struct bwfm_sdio_softc *, struct mbuf *);
-void		 bwfm_sdio_rx_frames(struct bwfm_sdio_softc *);
-void		 bwfm_sdio_rx_glom(struct bwfm_sdio_softc *, uint16_t *, int,
+struct mbuf *	 brcm_sdio_newbuf(void);
+int		 brcm_sdio_tx_ok(struct brcm_sdio_softc *);
+void		 brcm_sdio_tx_frames(struct brcm_sdio_softc *);
+void		 brcm_sdio_tx_ctrlframe(struct brcm_sdio_softc *, struct mbuf *);
+void		 brcm_sdio_tx_dataframe(struct brcm_sdio_softc *, struct mbuf *);
+void		 brcm_sdio_rx_frames(struct brcm_sdio_softc *);
+void		 brcm_sdio_rx_glom(struct brcm_sdio_softc *, uint16_t *, int,
 		    uint16_t *, struct mbuf_list *);
 
-int		 bwfm_sdio_txcheck(struct bwfm_softc *);
-int		 bwfm_sdio_txdata(struct bwfm_softc *, struct mbuf *);
-int		 bwfm_sdio_txctl(struct bwfm_softc *, void *);
+int		 brcm_sdio_txcheck(struct brcm_softc *);
+int		 brcm_sdio_txdata(struct brcm_softc *, struct mbuf *);
+int		 brcm_sdio_txctl(struct brcm_softc *, void *);
 
-#ifdef BWFM_DEBUG
-void		 bwfm_sdio_debug_console(struct bwfm_sdio_softc *);
+#ifdef BRCM_DEBUG
+void		 brcm_sdio_debug_console(struct brcm_sdio_softc *);
 #endif
 
-struct bwfm_bus_ops bwfm_sdio_bus_ops = {
-	.bs_preinit = bwfm_sdio_preinit,
+struct brcm_bus_ops brcm_sdio_bus_ops = {
+	.bs_preinit = brcm_sdio_preinit,
 	.bs_stop = NULL,
-	.bs_txcheck = bwfm_sdio_txcheck,
-	.bs_txdata = bwfm_sdio_txdata,
-	.bs_txctl = bwfm_sdio_txctl,
+	.bs_txcheck = brcm_sdio_txcheck,
+	.bs_txdata = brcm_sdio_txdata,
+	.bs_txctl = brcm_sdio_txctl,
 };
 
-struct bwfm_buscore_ops bwfm_sdio_buscore_ops = {
-	.bc_read = bwfm_sdio_buscore_read,
-	.bc_write = bwfm_sdio_buscore_write,
-	.bc_prepare = bwfm_sdio_buscore_prepare,
+struct brcm_buscore_ops brcm_sdio_buscore_ops = {
+	.bc_read = brcm_sdio_buscore_read,
+	.bc_write = brcm_sdio_buscore_write,
+	.bc_prepare = brcm_sdio_buscore_prepare,
 	.bc_reset = NULL,
 	.bc_setup = NULL,
-	.bc_activate = bwfm_sdio_buscore_activate,
+	.bc_activate = brcm_sdio_buscore_activate,
 };
 
-const struct cfattach bwfm_sdio_ca = {
-	sizeof(struct bwfm_sdio_softc),
-	bwfm_sdio_match,
-	bwfm_sdio_attach,
-	bwfm_sdio_detach,
+const struct cfattach brcm_sdio_ca = {
+	sizeof(struct brcm_sdio_softc),
+	brcm_sdio_match,
+	brcm_sdio_attach,
+	brcm_sdio_detach,
 };
 
 int
-bwfm_sdio_match(struct device *parent, void *match, void *aux)
+brcm_sdio_match(struct device *parent, void *match, void *aux)
 {
 	struct sdmmc_attach_args *saa = aux;
 	struct sdmmc_function *sf = saa->sf;
@@ -246,12 +246,12 @@ bwfm_sdio_match(struct device *parent, void *match, void *aux)
 }
 
 void
-bwfm_sdio_attach(struct device *parent, struct device *self, void *aux)
+brcm_sdio_attach(struct device *parent, struct device *self, void *aux)
 {
-	struct bwfm_sdio_softc *sc = (struct bwfm_sdio_softc *)self;
+	struct brcm_sdio_softc *sc = (struct brcm_sdio_softc *)self;
 	struct sdmmc_attach_args *saa = aux;
 	struct sdmmc_function *sf = saa->sf;
-	struct bwfm_core *core;
+	struct brcm_core *core;
 	uint32_t reg;
 
 	printf("\n");
@@ -261,7 +261,7 @@ bwfm_sdio_attach(struct device *parent, struct device *self, void *aux)
 		sc->sc_sc.sc_node = *(int *)sf->cookie;
 #endif
 
-	task_set(&sc->sc_task, bwfm_sdio_task, sc);
+	task_set(&sc->sc_task, brcm_sdio_task, sc);
 	ml_init(&sc->sc_tx_queue);
 	sc->sc_bounce_size = 64 * 1024;
 	sc->sc_bounce_buf = dma_alloc(sc->sc_bounce_size, PR_WAITOK);
@@ -289,55 +289,55 @@ bwfm_sdio_attach(struct device *parent, struct device *self, void *aux)
 	}
 
 	DPRINTF(("%s: F1 signature read @0x18000000=%x\n", DEVNAME(sc),
-	    bwfm_sdio_read_4(sc, 0x18000000)));
+	    brcm_sdio_read_4(sc, 0x18000000)));
 
 	/* Force PLL off */
-	bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR,
-	    BWFM_SDIO_FUNC1_CHIPCLKCSR_FORCE_HW_CLKREQ_OFF |
-	    BWFM_SDIO_FUNC1_CHIPCLKCSR_ALP_AVAIL_REQ);
+	brcm_sdio_write_1(sc, BRCM_SDIO_FUNC1_CHIPCLKCSR,
+	    BRCM_SDIO_FUNC1_CHIPCLKCSR_FORCE_HW_CLKREQ_OFF |
+	    BRCM_SDIO_FUNC1_CHIPCLKCSR_ALP_AVAIL_REQ);
 
-	sc->sc_sc.sc_buscore_ops = &bwfm_sdio_buscore_ops;
-	if (bwfm_chip_attach(&sc->sc_sc) != 0) {
+	sc->sc_sc.sc_buscore_ops = &brcm_sdio_buscore_ops;
+	if (brcm_chip_attach(&sc->sc_sc) != 0) {
 		printf("%s: cannot attach chip\n", DEVNAME(sc));
 		goto err;
 	}
 
-	sc->sc_cc = bwfm_chip_get_core(&sc->sc_sc, BWFM_AGENT_CORE_CHIPCOMMON);
+	sc->sc_cc = brcm_chip_get_core(&sc->sc_sc, BRCM_AGENT_CORE_CHIPCOMMON);
 	if (sc->sc_cc == NULL) {
 		printf("%s: cannot find chipcommon core\n", DEVNAME(sc));
 		goto err;
 	}
 
-	core = bwfm_chip_get_core(&sc->sc_sc, BWFM_AGENT_CORE_SDIO_DEV);
+	core = brcm_chip_get_core(&sc->sc_sc, BRCM_AGENT_CORE_SDIO_DEV);
 	if (core->co_rev >= 12) {
-		reg = bwfm_sdio_read_1(sc, BWFM_SDIO_FUNC1_SLEEPCSR);
-		if (!(reg & BWFM_SDIO_FUNC1_SLEEPCSR_KSO)) {
-			reg |= BWFM_SDIO_FUNC1_SLEEPCSR_KSO;
-			bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_SLEEPCSR, reg);
+		reg = brcm_sdio_read_1(sc, BRCM_SDIO_FUNC1_SLEEPCSR);
+		if (!(reg & BRCM_SDIO_FUNC1_SLEEPCSR_KSO)) {
+			reg |= BRCM_SDIO_FUNC1_SLEEPCSR_KSO;
+			brcm_sdio_write_1(sc, BRCM_SDIO_FUNC1_SLEEPCSR, reg);
 		}
 	}
 
 	/* TODO: drive strength */
 
-	bwfm_sdio_write_1(sc, BWFM_SDIO_CCCR_BRCM_CARDCTRL,
-	    bwfm_sdio_read_1(sc, BWFM_SDIO_CCCR_BRCM_CARDCTRL) |
-	    BWFM_SDIO_CCCR_BRCM_CARDCTRL_WLANRESET);
+	brcm_sdio_write_1(sc, BRCM_SDIO_CCCR_BRCM_CARDCTRL,
+	    brcm_sdio_read_1(sc, BRCM_SDIO_CCCR_BRCM_CARDCTRL) |
+	    BRCM_SDIO_CCCR_BRCM_CARDCTRL_WLANRESET);
 
-	core = bwfm_chip_get_pmu(&sc->sc_sc);
-	bwfm_sdio_write_4(sc, core->co_base + BWFM_CHIP_REG_PMUCONTROL,
-	    bwfm_sdio_read_4(sc, core->co_base + BWFM_CHIP_REG_PMUCONTROL) |
-	    (BWFM_CHIP_REG_PMUCONTROL_RES_RELOAD <<
-	     BWFM_CHIP_REG_PMUCONTROL_RES_SHIFT));
+	core = brcm_chip_get_pmu(&sc->sc_sc);
+	brcm_sdio_write_4(sc, core->co_base + BRCM_CHIP_REG_PMUCONTROL,
+	    brcm_sdio_read_4(sc, core->co_base + BRCM_CHIP_REG_PMUCONTROL) |
+	    (BRCM_CHIP_REG_PMUCONTROL_RES_RELOAD <<
+	     BRCM_CHIP_REG_PMUCONTROL_RES_SHIFT));
 
 	sdmmc_io_function_disable(sc->sc_sf[2]);
 
-	bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR, 0);
+	brcm_sdio_write_1(sc, BRCM_SDIO_FUNC1_CHIPCLKCSR, 0);
 	sc->sc_clkstate = CLK_SDONLY;
 
-	sc->sc_sc.sc_bus_ops = &bwfm_sdio_bus_ops;
-	sc->sc_sc.sc_proto_ops = &bwfm_proto_bcdc_ops;
-	bwfm_attach(&sc->sc_sc);
-	config_mountroot(self, bwfm_attachhook);
+	sc->sc_sc.sc_bus_ops = &brcm_sdio_bus_ops;
+	sc->sc_sc.sc_proto_ops = &brcm_proto_bcdc_ops;
+	brcm_attach(&sc->sc_sc);
+	config_mountroot(self, brcm_attachhook);
 	return;
 
 err:
@@ -345,9 +345,9 @@ err:
 }
 
 int
-bwfm_sdio_preinit(struct bwfm_softc *bwfm)
+brcm_sdio_preinit(struct brcm_softc *brcm)
 {
-	struct bwfm_sdio_softc *sc = (void *)bwfm;
+	struct brcm_sdio_softc *sc = (void *)brcm;
 	const char *chip = NULL;
 	uint32_t clk, reg;
 	u_char *ucode, *nvram;
@@ -358,12 +358,12 @@ bwfm_sdio_preinit(struct bwfm_softc *bwfm)
 
 	rw_enter_write(sc->sc_lock);
 
-	switch (bwfm->sc_chip.ch_chip)
+	switch (brcm->sc_chip.ch_chip)
 	{
 	case BRCM_CC_43241_CHIP_ID:
-		if (bwfm->sc_chip.ch_chiprev <= 4)
+		if (brcm->sc_chip.ch_chiprev <= 4)
 			chip = "43241b0";
-		else if (bwfm->sc_chip.ch_chiprev == 5)
+		else if (brcm->sc_chip.ch_chiprev == 5)
 			chip = "43241b4";
 		else
 			chip = "43241b5";
@@ -375,7 +375,7 @@ bwfm_sdio_preinit(struct bwfm_softc *bwfm)
 		chip = "4334";
 		break;
 	case BRCM_CC_4345_CHIP_ID:
-		if (bwfm->sc_chip.ch_chiprev == 9)
+		if (brcm->sc_chip.ch_chiprev == 9)
 			chip = "43456";
 		else
 			chip = "43455";
@@ -385,7 +385,7 @@ bwfm_sdio_preinit(struct bwfm_softc *bwfm)
 		chip = "43340";
 		break;
 	case BRCM_CC_4335_CHIP_ID:
-		if (bwfm->sc_chip.ch_chiprev < 2)
+		if (brcm->sc_chip.ch_chiprev < 2)
 			chip = "4335";
 		else
 			chip = "4339";
@@ -394,9 +394,9 @@ bwfm_sdio_preinit(struct bwfm_softc *bwfm)
 		chip = "4339";
 		break;
 	case BRCM_CC_43430_CHIP_ID:
-		if (bwfm->sc_chip.ch_chiprev == 0)
+		if (brcm->sc_chip.ch_chiprev == 0)
 			chip = "43430a0";
-		else if (bwfm->sc_chip.ch_chiprev == 2)
+		else if (brcm->sc_chip.ch_chiprev == 2)
 			chip = "43436";
 		else
 			chip = "43430";
@@ -409,16 +409,16 @@ bwfm_sdio_preinit(struct bwfm_softc *bwfm)
 		break;
 	default:
 		printf("%s: unknown firmware for chip %s\n",
-		    DEVNAME(sc), bwfm->sc_chip.ch_name);
+		    DEVNAME(sc), brcm->sc_chip.ch_name);
 		goto err;
 	}
 
-	if (bwfm_loadfirmware(bwfm, chip, "-sdio", &ucode, &size,
+	if (brcm_loadfirmware(brcm, chip, "-sdio", &ucode, &size,
 	    &nvram, &nvsize, &nvlen) != 0)
 		goto err;
 
 	sc->sc_alp_only = 1;
-	if (bwfm_sdio_load_microcode(sc, ucode, size,
+	if (brcm_sdio_load_microcode(sc, ucode, size,
 	    nvram, nvlen) != 0) {
 		printf("%s: could not load microcode\n",
 		    DEVNAME(sc));
@@ -430,58 +430,58 @@ bwfm_sdio_preinit(struct bwfm_softc *bwfm)
 	free(ucode, M_DEVBUF, size);
 	free(nvram, M_DEVBUF, nvsize);
 
-	bwfm_sdio_clkctl(sc, CLK_AVAIL, 0);
+	brcm_sdio_clkctl(sc, CLK_AVAIL, 0);
 	if (sc->sc_clkstate != CLK_AVAIL)
 		goto err;
 
-	clk = bwfm_sdio_read_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR);
-	bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR,
-	    clk | BWFM_SDIO_FUNC1_CHIPCLKCSR_FORCE_HT);
+	clk = brcm_sdio_read_1(sc, BRCM_SDIO_FUNC1_CHIPCLKCSR);
+	brcm_sdio_write_1(sc, BRCM_SDIO_FUNC1_CHIPCLKCSR,
+	    clk | BRCM_SDIO_FUNC1_CHIPCLKCSR_FORCE_HT);
 
-	bwfm_sdio_dev_write(sc, SDPCMD_TOSBMAILBOXDATA,
+	brcm_sdio_dev_write(sc, SDPCMD_TOSBMAILBOXDATA,
 	    SDPCM_PROT_VERSION << SDPCM_PROT_VERSION_SHIFT);
 	if (sdmmc_io_function_enable(sc->sc_sf[2]) != 0) {
 		printf("%s: cannot enable function 2\n", DEVNAME(sc));
 		goto err;
 	}
 
-	bwfm_sdio_dev_write(sc, SDPCMD_HOSTINTMASK,
+	brcm_sdio_dev_write(sc, SDPCMD_HOSTINTMASK,
 	    SDPCMD_INTSTATUS_HMB_SW_MASK|SDPCMD_INTSTATUS_CHIPACTIVE);
-	bwfm_sdio_write_1(sc, BWFM_SDIO_WATERMARK, 8);
+	brcm_sdio_write_1(sc, BRCM_SDIO_WATERMARK, 8);
 
-	if (bwfm_chip_sr_capable(bwfm)) {
-		reg = bwfm_sdio_read_1(sc, BWFM_SDIO_FUNC1_WAKEUPCTRL);
-		reg |= BWFM_SDIO_FUNC1_WAKEUPCTRL_HTWAIT;
-		bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_WAKEUPCTRL, reg);
-		bwfm_sdio_write_1(sc, BWFM_SDIO_CCCR_CARDCAP,
-		    BWFM_SDIO_CCCR_CARDCAP_CMD14_SUPPORT |
-		    BWFM_SDIO_CCCR_CARDCAP_CMD14_EXT);
-		bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR,
-		    BWFM_SDIO_FUNC1_CHIPCLKCSR_FORCE_HT);
+	if (brcm_chip_sr_capable(brcm)) {
+		reg = brcm_sdio_read_1(sc, BRCM_SDIO_FUNC1_WAKEUPCTRL);
+		reg |= BRCM_SDIO_FUNC1_WAKEUPCTRL_HTWAIT;
+		brcm_sdio_write_1(sc, BRCM_SDIO_FUNC1_WAKEUPCTRL, reg);
+		brcm_sdio_write_1(sc, BRCM_SDIO_CCCR_CARDCAP,
+		    BRCM_SDIO_CCCR_CARDCAP_CMD14_SUPPORT |
+		    BRCM_SDIO_CCCR_CARDCAP_CMD14_EXT);
+		brcm_sdio_write_1(sc, BRCM_SDIO_FUNC1_CHIPCLKCSR,
+		    BRCM_SDIO_FUNC1_CHIPCLKCSR_FORCE_HT);
 		sc->sc_sr_enabled = 1;
 	} else {
-		bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR, clk);
+		brcm_sdio_write_1(sc, BRCM_SDIO_FUNC1_CHIPCLKCSR, clk);
 	}
 
 #if defined(__HAVE_FDT)
 	if (sc->sc_sc.sc_node) {
 		sc->sc_ih = fdt_intr_establish(sc->sc_sc.sc_node,
-		    IPL_NET, bwfm_sdio_oob_intr, sc, DEVNAME(sc));
+		    IPL_NET, brcm_sdio_oob_intr, sc, DEVNAME(sc));
 		if (sc->sc_ih != NULL) {
-			bwfm_sdio_write_1(sc, BWFM_SDIO_CCCR_SEPINT,
-			    BWFM_SDIO_CCCR_SEPINT_MASK |
-			    BWFM_SDIO_CCCR_SEPINT_OE |
-			    BWFM_SDIO_CCCR_SEPINT_ACT_HI);
+			brcm_sdio_write_1(sc, BRCM_SDIO_CCCR_SEPINT,
+			    BRCM_SDIO_CCCR_SEPINT_MASK |
+			    BRCM_SDIO_CCCR_SEPINT_OE |
+			    BRCM_SDIO_CCCR_SEPINT_ACT_HI);
 			sc->sc_oob = 1;
 		}
 	}
 	if (sc->sc_ih == NULL)
 #endif
-	sc->sc_ih = sdmmc_intr_establish(bwfm->sc_dev.dv_parent,
-	    bwfm_sdio_intr, sc, DEVNAME(sc));
+	sc->sc_ih = sdmmc_intr_establish(brcm->sc_dev.dv_parent,
+	    brcm_sdio_intr, sc, DEVNAME(sc));
 	if (sc->sc_ih == NULL) {
 		printf("%s: can't establish interrupt\n", DEVNAME(sc));
-		bwfm_sdio_clkctl(sc, CLK_NONE, 0);
+		brcm_sdio_clkctl(sc, CLK_NONE, 0);
 		goto err;
 	}
 	sdmmc_intr_enable(sc->sc_sf[1]);
@@ -496,24 +496,24 @@ err:
 }
 
 int
-bwfm_sdio_load_microcode(struct bwfm_sdio_softc *sc, u_char *ucode, size_t size,
+brcm_sdio_load_microcode(struct brcm_sdio_softc *sc, u_char *ucode, size_t size,
     u_char *nvram, size_t nvlen)
 {
-	struct bwfm_softc *bwfm = (void *)sc;
+	struct brcm_softc *brcm = (void *)sc;
 	char *verify = NULL;
 	int err = 0;
 
-	bwfm_sdio_clkctl(sc, CLK_AVAIL, 0);
+	brcm_sdio_clkctl(sc, CLK_AVAIL, 0);
 
 	/* Upload firmware */
-	err = bwfm_sdio_ram_read_write(sc, bwfm->sc_chip.ch_rambase,
+	err = brcm_sdio_ram_read_write(sc, brcm->sc_chip.ch_rambase,
 	    ucode, size, 1);
 	if (err)
 		goto out;
 
 	/* Verify firmware */
 	verify = malloc(size, M_TEMP, M_WAITOK | M_ZERO);
-	err = bwfm_sdio_ram_read_write(sc, bwfm->sc_chip.ch_rambase,
+	err = brcm_sdio_ram_read_write(sc, brcm->sc_chip.ch_rambase,
 	    verify, size, 0);
 	if (err || memcmp(verify, ucode, size)) {
 		printf("%s: firmware verification failed\n",
@@ -524,15 +524,15 @@ bwfm_sdio_load_microcode(struct bwfm_sdio_softc *sc, u_char *ucode, size_t size,
 	free(verify, M_TEMP, size);
 
 	/* Upload nvram */
-	err = bwfm_sdio_ram_read_write(sc, bwfm->sc_chip.ch_rambase +
-	    bwfm->sc_chip.ch_ramsize - nvlen, nvram, nvlen, 1);
+	err = brcm_sdio_ram_read_write(sc, brcm->sc_chip.ch_rambase +
+	    brcm->sc_chip.ch_ramsize - nvlen, nvram, nvlen, 1);
 	if (err)
 		goto out;
 
 	/* Verify nvram */
 	verify = malloc(nvlen, M_TEMP, M_WAITOK | M_ZERO);
-	err = bwfm_sdio_ram_read_write(sc, bwfm->sc_chip.ch_rambase +
-	    bwfm->sc_chip.ch_ramsize - nvlen, verify, nvlen, 0);
+	err = brcm_sdio_ram_read_write(sc, brcm->sc_chip.ch_rambase +
+	    brcm->sc_chip.ch_ramsize - nvlen, verify, nvlen, 0);
 	if (err || memcmp(verify, nvram, nvlen)) {
 		printf("%s: nvram verification failed\n",
 		    DEVNAME(sc));
@@ -542,18 +542,18 @@ bwfm_sdio_load_microcode(struct bwfm_sdio_softc *sc, u_char *ucode, size_t size,
 	free(verify, M_TEMP, nvlen);
 
 	/* Load reset vector from firmware and kickstart core. */
-	bwfm_chip_set_active(bwfm, *(uint32_t *)ucode);
+	brcm_chip_set_active(brcm, *(uint32_t *)ucode);
 
 out:
-	bwfm_sdio_clkctl(sc, CLK_SDONLY, 0);
+	brcm_sdio_clkctl(sc, CLK_SDONLY, 0);
 	return err;
 }
 
 void
-bwfm_sdio_clkctl(struct bwfm_sdio_softc *sc, enum bwfm_sdio_clkstate newstate,
+brcm_sdio_clkctl(struct brcm_sdio_softc *sc, enum brcm_sdio_clkstate newstate,
     int pendok)
 {
-	enum bwfm_sdio_clkstate oldstate;
+	enum brcm_sdio_clkstate oldstate;
 
 	oldstate = sc->sc_clkstate;
 	if (sc->sc_clkstate == newstate)
@@ -563,20 +563,20 @@ bwfm_sdio_clkctl(struct bwfm_sdio_softc *sc, enum bwfm_sdio_clkstate newstate,
 	case CLK_AVAIL:
 		if (sc->sc_clkstate == CLK_NONE)
 			sc->sc_clkstate = CLK_SDONLY;
-		bwfm_sdio_htclk(sc, 1, pendok);
+		brcm_sdio_htclk(sc, 1, pendok);
 		break;
 	case CLK_SDONLY:
 		if (sc->sc_clkstate == CLK_NONE)
 			sc->sc_clkstate = CLK_SDONLY;
 		else if (sc->sc_clkstate == CLK_AVAIL)
-			bwfm_sdio_htclk(sc, 0, 0);
+			brcm_sdio_htclk(sc, 0, 0);
 		else
 			printf("%s: request for %d -> %d\n",
 			    DEVNAME(sc), sc->sc_clkstate, newstate);
 		break;
 	case CLK_NONE:
 		if (sc->sc_clkstate == CLK_AVAIL)
-			bwfm_sdio_htclk(sc, 0, 0);
+			brcm_sdio_htclk(sc, 0, 0);
 		sc->sc_clkstate = CLK_NONE;
 		break;
 	default:
@@ -588,7 +588,7 @@ bwfm_sdio_clkctl(struct bwfm_sdio_softc *sc, enum bwfm_sdio_clkstate newstate,
 }
 
 void
-bwfm_sdio_htclk(struct bwfm_sdio_softc *sc, int on, int pendok)
+brcm_sdio_htclk(struct brcm_sdio_softc *sc, int on, int pendok)
 {
 	uint32_t clkctl, devctl, req;
 	int i;
@@ -603,33 +603,33 @@ bwfm_sdio_htclk(struct bwfm_sdio_softc *sc, int on, int pendok)
 
 	if (on) {
 		if (sc->sc_alp_only)
-			req = BWFM_SDIO_FUNC1_CHIPCLKCSR_ALP_AVAIL_REQ;
+			req = BRCM_SDIO_FUNC1_CHIPCLKCSR_ALP_AVAIL_REQ;
 		else
-			req = BWFM_SDIO_FUNC1_CHIPCLKCSR_HT_AVAIL_REQ;
-		bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR, req);
+			req = BRCM_SDIO_FUNC1_CHIPCLKCSR_HT_AVAIL_REQ;
+		brcm_sdio_write_1(sc, BRCM_SDIO_FUNC1_CHIPCLKCSR, req);
 
-		clkctl = bwfm_sdio_read_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR);
-		if (!BWFM_SDIO_FUNC1_CHIPCLKCSR_CLKAV(clkctl, sc->sc_alp_only)
+		clkctl = brcm_sdio_read_1(sc, BRCM_SDIO_FUNC1_CHIPCLKCSR);
+		if (!BRCM_SDIO_FUNC1_CHIPCLKCSR_CLKAV(clkctl, sc->sc_alp_only)
 		    && pendok) {
-			devctl = bwfm_sdio_read_1(sc, BWFM_SDIO_DEVICE_CTL);
-			devctl |= BWFM_SDIO_DEVICE_CTL_CA_INT_ONLY;
-			bwfm_sdio_write_1(sc, BWFM_SDIO_DEVICE_CTL, devctl);
+			devctl = brcm_sdio_read_1(sc, BRCM_SDIO_DEVICE_CTL);
+			devctl |= BRCM_SDIO_DEVICE_CTL_CA_INT_ONLY;
+			brcm_sdio_write_1(sc, BRCM_SDIO_DEVICE_CTL, devctl);
 			sc->sc_clkstate = CLK_PENDING;
 			return;
 		} else if (sc->sc_clkstate == CLK_PENDING) {
-			devctl = bwfm_sdio_read_1(sc, BWFM_SDIO_DEVICE_CTL);
-			devctl &= ~BWFM_SDIO_DEVICE_CTL_CA_INT_ONLY;
-			bwfm_sdio_write_1(sc, BWFM_SDIO_DEVICE_CTL, devctl);
+			devctl = brcm_sdio_read_1(sc, BRCM_SDIO_DEVICE_CTL);
+			devctl &= ~BRCM_SDIO_DEVICE_CTL_CA_INT_ONLY;
+			brcm_sdio_write_1(sc, BRCM_SDIO_DEVICE_CTL, devctl);
 		}
 
 		for (i = 0; i < 5000; i++) {
-			if (BWFM_SDIO_FUNC1_CHIPCLKCSR_CLKAV(clkctl,
+			if (BRCM_SDIO_FUNC1_CHIPCLKCSR_CLKAV(clkctl,
 			    sc->sc_alp_only))
 				break;
-			clkctl = bwfm_sdio_read_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR);
+			clkctl = brcm_sdio_read_1(sc, BRCM_SDIO_FUNC1_CHIPCLKCSR);
 			delay(1000);
 		}
-		if (!BWFM_SDIO_FUNC1_CHIPCLKCSR_CLKAV(clkctl, sc->sc_alp_only)) {
+		if (!BRCM_SDIO_FUNC1_CHIPCLKCSR_CLKAV(clkctl, sc->sc_alp_only)) {
 			printf("%s: HT avail timeout\n", DEVNAME(sc));
 			return;
 		}
@@ -637,28 +637,28 @@ bwfm_sdio_htclk(struct bwfm_sdio_softc *sc, int on, int pendok)
 		sc->sc_clkstate = CLK_AVAIL;
 	} else {
 		if (sc->sc_clkstate == CLK_PENDING) {
-			devctl = bwfm_sdio_read_1(sc, BWFM_SDIO_DEVICE_CTL);
-			devctl &= ~BWFM_SDIO_DEVICE_CTL_CA_INT_ONLY;
-			bwfm_sdio_write_1(sc, BWFM_SDIO_DEVICE_CTL, devctl);
+			devctl = brcm_sdio_read_1(sc, BRCM_SDIO_DEVICE_CTL);
+			devctl &= ~BRCM_SDIO_DEVICE_CTL_CA_INT_ONLY;
+			brcm_sdio_write_1(sc, BRCM_SDIO_DEVICE_CTL, devctl);
 		}
 		sc->sc_clkstate = CLK_SDONLY;
-		bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR, 0);
+		brcm_sdio_write_1(sc, BRCM_SDIO_FUNC1_CHIPCLKCSR, 0);
 	}
 }
 
 void
-bwfm_sdio_readshared(struct bwfm_sdio_softc *sc)
+brcm_sdio_readshared(struct brcm_sdio_softc *sc)
 {
-	struct bwfm_softc *bwfm = (void *)sc;
-	struct bwfm_sdio_sdpcm sdpcm;
+	struct brcm_softc *brcm = (void *)sc;
+	struct brcm_sdio_sdpcm sdpcm;
 	uint32_t addr, shaddr;
 	int err;
 
-	shaddr = bwfm->sc_chip.ch_rambase + bwfm->sc_chip.ch_ramsize - 4;
-	if (!bwfm->sc_chip.ch_rambase && bwfm_chip_sr_capable(bwfm))
-		shaddr -= bwfm->sc_chip.ch_srsize;
+	shaddr = brcm->sc_chip.ch_rambase + brcm->sc_chip.ch_ramsize - 4;
+	if (!brcm->sc_chip.ch_rambase && brcm_chip_sr_capable(brcm))
+		shaddr -= brcm->sc_chip.ch_srsize;
 
-	err = bwfm_sdio_ram_read_write(sc, shaddr, (char *)&addr,
+	err = brcm_sdio_ram_read_write(sc, shaddr, (char *)&addr,
 	    sizeof(addr), 0);
 	if (err)
 		return;
@@ -667,7 +667,7 @@ bwfm_sdio_readshared(struct bwfm_sdio_softc *sc)
 	if (addr == 0 || ((~addr >> 16) & 0xffff) == (addr & 0xffff))
 		return;
 
-	err = bwfm_sdio_ram_read_write(sc, addr, (char *)&sdpcm,
+	err = brcm_sdio_ram_read_write(sc, addr, (char *)&sdpcm,
 	    sizeof(sdpcm), 0);
 	if (err)
 		return;
@@ -676,17 +676,17 @@ bwfm_sdio_readshared(struct bwfm_sdio_softc *sc)
 }
 
 int
-bwfm_sdio_intr(void *v)
+brcm_sdio_intr(void *v)
 {
-	bwfm_sdio_task(v);
+	brcm_sdio_task(v);
 	return 1;
 }
 
 #if defined(__HAVE_FDT)
 int
-bwfm_sdio_oob_intr(void *v)
+brcm_sdio_oob_intr(void *v)
 {
-	struct bwfm_sdio_softc *sc = (void *)v;
+	struct brcm_sdio_softc *sc = (void *)v;
 	if (!sc->sc_oob)
 		return 0;
 	fdt_intr_disable(sc->sc_ih);
@@ -696,51 +696,51 @@ bwfm_sdio_oob_intr(void *v)
 #endif
 
 void
-bwfm_sdio_task(void *v)
+brcm_sdio_task(void *v)
 {
-	struct bwfm_sdio_softc *sc = (void *)v;
+	struct brcm_sdio_softc *sc = (void *)v;
 	uint32_t clkctl, devctl, intstat, hostint;
 
 	rw_enter_write(sc->sc_lock);
 
 	if (!sc->sc_sr_enabled && sc->sc_clkstate == CLK_PENDING) {
-		clkctl = bwfm_sdio_read_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR);
-		if (BWFM_SDIO_FUNC1_CHIPCLKCSR_HTAV(clkctl)) {
-			devctl = bwfm_sdio_read_1(sc, BWFM_SDIO_DEVICE_CTL);
-			devctl &= ~BWFM_SDIO_DEVICE_CTL_CA_INT_ONLY;
-			bwfm_sdio_write_1(sc, BWFM_SDIO_DEVICE_CTL, devctl);
+		clkctl = brcm_sdio_read_1(sc, BRCM_SDIO_FUNC1_CHIPCLKCSR);
+		if (BRCM_SDIO_FUNC1_CHIPCLKCSR_HTAV(clkctl)) {
+			devctl = brcm_sdio_read_1(sc, BRCM_SDIO_DEVICE_CTL);
+			devctl &= ~BRCM_SDIO_DEVICE_CTL_CA_INT_ONLY;
+			brcm_sdio_write_1(sc, BRCM_SDIO_DEVICE_CTL, devctl);
 			sc->sc_clkstate = CLK_AVAIL;
 		}
 	}
 
-	intstat = bwfm_sdio_dev_read(sc, BWFM_SDPCMD_INTSTATUS);
+	intstat = brcm_sdio_dev_read(sc, BRCM_SDPCMD_INTSTATUS);
 	intstat &= (SDPCMD_INTSTATUS_HMB_SW_MASK|SDPCMD_INTSTATUS_CHIPACTIVE);
 	/* XXX fc state */
 	if (intstat)
-		bwfm_sdio_dev_write(sc, BWFM_SDPCMD_INTSTATUS, intstat);
+		brcm_sdio_dev_write(sc, BRCM_SDPCMD_INTSTATUS, intstat);
 
 	if (intstat & SDPCMD_INTSTATUS_HMB_HOST_INT) {
-		hostint = bwfm_sdio_dev_read(sc, SDPCMD_TOHOSTMAILBOXDATA);
-		bwfm_sdio_dev_write(sc, SDPCMD_TOSBMAILBOX,
+		hostint = brcm_sdio_dev_read(sc, SDPCMD_TOHOSTMAILBOXDATA);
+		brcm_sdio_dev_write(sc, SDPCMD_TOSBMAILBOX,
 		    SDPCMD_TOSBMAILBOX_INT_ACK);
 		if (hostint & SDPCMD_TOHOSTMAILBOXDATA_NAKHANDLED)
 			intstat |= SDPCMD_INTSTATUS_HMB_FRAME_IND;
 		if (hostint & SDPCMD_TOHOSTMAILBOXDATA_DEVREADY ||
 		    hostint & SDPCMD_TOHOSTMAILBOXDATA_FWREADY)
-			bwfm_sdio_readshared(sc);
+			brcm_sdio_readshared(sc);
 	}
 
 	/* FIXME: Might stall if we don't when not set. */
 	if (1 || intstat & SDPCMD_INTSTATUS_HMB_FRAME_IND) {
-		bwfm_sdio_rx_frames(sc);
+		brcm_sdio_rx_frames(sc);
 	}
 
 	if (!ml_empty(&sc->sc_tx_queue)) {
-		bwfm_sdio_tx_frames(sc);
+		brcm_sdio_tx_frames(sc);
 	}
 
-#ifdef BWFM_DEBUG
-	bwfm_sdio_debug_console(sc);
+#ifdef BRCM_DEBUG
+	brcm_sdio_debug_console(sc);
 #endif
 
 	rw_exit(sc->sc_lock);
@@ -752,11 +752,11 @@ bwfm_sdio_task(void *v)
 }
 
 int
-bwfm_sdio_detach(struct device *self, int flags)
+brcm_sdio_detach(struct device *self, int flags)
 {
-	struct bwfm_sdio_softc *sc = (struct bwfm_sdio_softc *)self;
+	struct brcm_sdio_softc *sc = (struct brcm_sdio_softc *)self;
 
-	bwfm_detach(&sc->sc_sc, flags);
+	brcm_detach(&sc->sc_sc, flags);
 
 	dma_free(sc->sc_bounce_buf, sc->sc_bounce_size);
 	free(sc->sc_sf, M_DEVBUF, 0);
@@ -765,22 +765,22 @@ bwfm_sdio_detach(struct device *self, int flags)
 }
 
 void
-bwfm_sdio_backplane(struct bwfm_sdio_softc *sc, uint32_t bar0)
+brcm_sdio_backplane(struct brcm_sdio_softc *sc, uint32_t bar0)
 {
 	if (sc->sc_bar0 == bar0)
 		return;
 
-	bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_SBADDRLOW,
+	brcm_sdio_write_1(sc, BRCM_SDIO_FUNC1_SBADDRLOW,
 	    (bar0 >>  8) & 0x80);
-	bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_SBADDRMID,
+	brcm_sdio_write_1(sc, BRCM_SDIO_FUNC1_SBADDRMID,
 	    (bar0 >> 16) & 0xff);
-	bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_SBADDRHIGH,
+	brcm_sdio_write_1(sc, BRCM_SDIO_FUNC1_SBADDRHIGH,
 	    (bar0 >> 24) & 0xff);
 	sc->sc_bar0 = bar0;
 }
 
 uint8_t
-bwfm_sdio_read_1(struct bwfm_sdio_softc *sc, uint32_t addr)
+brcm_sdio_read_1(struct brcm_sdio_softc *sc, uint32_t addr)
 {
 	struct sdmmc_function *sf;
 	uint8_t rv;
@@ -801,16 +801,16 @@ bwfm_sdio_read_1(struct bwfm_sdio_softc *sc, uint32_t addr)
 }
 
 uint32_t
-bwfm_sdio_read_4(struct bwfm_sdio_softc *sc, uint32_t addr)
+brcm_sdio_read_4(struct brcm_sdio_softc *sc, uint32_t addr)
 {
 	struct sdmmc_function *sf;
-	uint32_t bar0 = addr & ~BWFM_SDIO_SB_OFT_ADDR_MASK;
+	uint32_t bar0 = addr & ~BRCM_SDIO_SB_OFT_ADDR_MASK;
 	uint32_t rv;
 
-	bwfm_sdio_backplane(sc, bar0);
+	brcm_sdio_backplane(sc, bar0);
 
-	addr &= BWFM_SDIO_SB_OFT_ADDR_MASK;
-	addr |= BWFM_SDIO_SB_ACCESS_2_4B_FLAG;
+	addr &= BRCM_SDIO_SB_OFT_ADDR_MASK;
+	addr |= BRCM_SDIO_SB_ACCESS_2_4B_FLAG;
 
 	/*
 	 * figure out how to read the register based on address range
@@ -828,7 +828,7 @@ bwfm_sdio_read_4(struct bwfm_sdio_softc *sc, uint32_t addr)
 }
 
 void
-bwfm_sdio_write_1(struct bwfm_sdio_softc *sc, uint32_t addr, uint8_t data)
+brcm_sdio_write_1(struct brcm_sdio_softc *sc, uint32_t addr, uint8_t data)
 {
 	struct sdmmc_function *sf;
 
@@ -847,15 +847,15 @@ bwfm_sdio_write_1(struct bwfm_sdio_softc *sc, uint32_t addr, uint8_t data)
 }
 
 void
-bwfm_sdio_write_4(struct bwfm_sdio_softc *sc, uint32_t addr, uint32_t data)
+brcm_sdio_write_4(struct brcm_sdio_softc *sc, uint32_t addr, uint32_t data)
 {
 	struct sdmmc_function *sf;
-	uint32_t bar0 = addr & ~BWFM_SDIO_SB_OFT_ADDR_MASK;
+	uint32_t bar0 = addr & ~BRCM_SDIO_SB_OFT_ADDR_MASK;
 
-	bwfm_sdio_backplane(sc, bar0);
+	brcm_sdio_backplane(sc, bar0);
 
-	addr &= BWFM_SDIO_SB_OFT_ADDR_MASK;
-	addr |= BWFM_SDIO_SB_ACCESS_2_4B_FLAG;
+	addr &= BRCM_SDIO_SB_OFT_ADDR_MASK;
+	addr |= BRCM_SDIO_SB_ACCESS_2_4B_FLAG;
 
 	/*
 	 * figure out how to read the register based on address range
@@ -872,7 +872,7 @@ bwfm_sdio_write_4(struct bwfm_sdio_softc *sc, uint32_t addr, uint32_t data)
 }
 
 int
-bwfm_sdio_buf_read(struct bwfm_sdio_softc *sc, struct sdmmc_function *sf,
+brcm_sdio_buf_read(struct brcm_sdio_softc *sc, struct sdmmc_function *sf,
     uint32_t reg, char *data, size_t size)
 {
 	int err;
@@ -892,7 +892,7 @@ bwfm_sdio_buf_read(struct bwfm_sdio_softc *sc, struct sdmmc_function *sf,
 }
 
 int
-bwfm_sdio_buf_write(struct bwfm_sdio_softc *sc, struct sdmmc_function *sf,
+brcm_sdio_buf_write(struct brcm_sdio_softc *sc, struct sdmmc_function *sf,
     uint32_t reg, char *data, size_t size)
 {
 	int err;
@@ -909,7 +909,7 @@ bwfm_sdio_buf_write(struct bwfm_sdio_softc *sc, struct sdmmc_function *sf,
 }
 
 uint32_t
-bwfm_sdio_ram_read_write(struct bwfm_sdio_softc *sc, uint32_t reg,
+brcm_sdio_ram_read_write(struct brcm_sdio_softc *sc, uint32_t reg,
     char *data, size_t left, int write)
 {
 	uint32_t sbaddr, sdaddr, off;
@@ -919,21 +919,21 @@ bwfm_sdio_ram_read_write(struct bwfm_sdio_softc *sc, uint32_t reg,
 	err = off = 0;
 	while (left > 0) {
 		sbaddr = reg + off;
-		bwfm_sdio_backplane(sc, sbaddr);
+		brcm_sdio_backplane(sc, sbaddr);
 
-		sdaddr = sbaddr & BWFM_SDIO_SB_OFT_ADDR_MASK;
-		size = min(left, (BWFM_SDIO_SB_OFT_ADDR_PAGE - sdaddr));
-		sdaddr |= BWFM_SDIO_SB_ACCESS_2_4B_FLAG;
+		sdaddr = sbaddr & BRCM_SDIO_SB_OFT_ADDR_MASK;
+		size = min(left, (BRCM_SDIO_SB_OFT_ADDR_PAGE - sdaddr));
+		sdaddr |= BRCM_SDIO_SB_ACCESS_2_4B_FLAG;
 
 		if (write) {
 			memcpy(sc->sc_bounce_buf, data + off, size);
 			if (roundup(size, 4) != size)
 				memset(sc->sc_bounce_buf + size, 0,
 				    roundup(size, 4) - size);
-			err = bwfm_sdio_buf_write(sc, sc->sc_sf[1], sdaddr,
+			err = brcm_sdio_buf_write(sc, sc->sc_sf[1], sdaddr,
 			    sc->sc_bounce_buf, roundup(size, 4));
 		} else {
-			err = bwfm_sdio_buf_read(sc, sc->sc_sf[1], sdaddr,
+			err = brcm_sdio_buf_read(sc, sc->sc_sf[1], sdaddr,
 			    sc->sc_bounce_buf, roundup(size, 4));
 			memcpy(data + off, sc->sc_bounce_buf, size);
 		}
@@ -948,70 +948,70 @@ bwfm_sdio_ram_read_write(struct bwfm_sdio_softc *sc, uint32_t reg,
 }
 
 uint32_t
-bwfm_sdio_frame_read_write(struct bwfm_sdio_softc *sc,
+brcm_sdio_frame_read_write(struct brcm_sdio_softc *sc,
     char *data, size_t size, int write)
 {
 	uint32_t addr;
 	int err;
 
 	addr = sc->sc_cc->co_base;
-	bwfm_sdio_backplane(sc, addr);
+	brcm_sdio_backplane(sc, addr);
 
-	addr &= BWFM_SDIO_SB_OFT_ADDR_MASK;
-	addr |= BWFM_SDIO_SB_ACCESS_2_4B_FLAG;
+	addr &= BRCM_SDIO_SB_OFT_ADDR_MASK;
+	addr |= BRCM_SDIO_SB_ACCESS_2_4B_FLAG;
 
 	if (write)
-		err = bwfm_sdio_buf_write(sc, sc->sc_sf[2], addr, data, size);
+		err = brcm_sdio_buf_write(sc, sc->sc_sf[2], addr, data, size);
 	else
-		err = bwfm_sdio_buf_read(sc, sc->sc_sf[2], addr, data, size);
+		err = brcm_sdio_buf_read(sc, sc->sc_sf[2], addr, data, size);
 
 	return err;
 }
 
 uint32_t
-bwfm_sdio_dev_read(struct bwfm_sdio_softc *sc, uint32_t reg)
+brcm_sdio_dev_read(struct brcm_sdio_softc *sc, uint32_t reg)
 {
-	struct bwfm_core *core;
-	core = bwfm_chip_get_core(&sc->sc_sc, BWFM_AGENT_CORE_SDIO_DEV);
-	return bwfm_sdio_read_4(sc, core->co_base + reg);
+	struct brcm_core *core;
+	core = brcm_chip_get_core(&sc->sc_sc, BRCM_AGENT_CORE_SDIO_DEV);
+	return brcm_sdio_read_4(sc, core->co_base + reg);
 }
 
 void
-bwfm_sdio_dev_write(struct bwfm_sdio_softc *sc, uint32_t reg, uint32_t val)
+brcm_sdio_dev_write(struct brcm_sdio_softc *sc, uint32_t reg, uint32_t val)
 {
-	struct bwfm_core *core;
-	core = bwfm_chip_get_core(&sc->sc_sc, BWFM_AGENT_CORE_SDIO_DEV);
-	bwfm_sdio_write_4(sc, core->co_base + reg, val);
+	struct brcm_core *core;
+	core = brcm_chip_get_core(&sc->sc_sc, BRCM_AGENT_CORE_SDIO_DEV);
+	brcm_sdio_write_4(sc, core->co_base + reg, val);
 }
 
 uint32_t
-bwfm_sdio_buscore_read(struct bwfm_softc *bwfm, uint32_t reg)
+brcm_sdio_buscore_read(struct brcm_softc *brcm, uint32_t reg)
 {
-	struct bwfm_sdio_softc *sc = (void *)bwfm;
-	return bwfm_sdio_read_4(sc, reg);
+	struct brcm_sdio_softc *sc = (void *)brcm;
+	return brcm_sdio_read_4(sc, reg);
 }
 
 void
-bwfm_sdio_buscore_write(struct bwfm_softc *bwfm, uint32_t reg, uint32_t val)
+brcm_sdio_buscore_write(struct brcm_softc *brcm, uint32_t reg, uint32_t val)
 {
-	struct bwfm_sdio_softc *sc = (void *)bwfm;
-	bwfm_sdio_write_4(sc, reg, val);
+	struct brcm_sdio_softc *sc = (void *)brcm;
+	brcm_sdio_write_4(sc, reg, val);
 }
 
 int
-bwfm_sdio_buscore_prepare(struct bwfm_softc *bwfm)
+brcm_sdio_buscore_prepare(struct brcm_softc *brcm)
 {
-	struct bwfm_sdio_softc *sc = (void *)bwfm;
+	struct brcm_sdio_softc *sc = (void *)brcm;
 	uint8_t clkval, clkset, clkmask;
 	int i;
 
-	clkset = BWFM_SDIO_FUNC1_CHIPCLKCSR_ALP_AVAIL_REQ |
-	    BWFM_SDIO_FUNC1_CHIPCLKCSR_FORCE_HW_CLKREQ_OFF;
-	bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR, clkset);
+	clkset = BRCM_SDIO_FUNC1_CHIPCLKCSR_ALP_AVAIL_REQ |
+	    BRCM_SDIO_FUNC1_CHIPCLKCSR_FORCE_HW_CLKREQ_OFF;
+	brcm_sdio_write_1(sc, BRCM_SDIO_FUNC1_CHIPCLKCSR, clkset);
 
-	clkmask = BWFM_SDIO_FUNC1_CHIPCLKCSR_ALP_AVAIL |
-	    BWFM_SDIO_FUNC1_CHIPCLKCSR_HT_AVAIL;
-	clkval = bwfm_sdio_read_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR);
+	clkmask = BRCM_SDIO_FUNC1_CHIPCLKCSR_ALP_AVAIL |
+	    BRCM_SDIO_FUNC1_CHIPCLKCSR_HT_AVAIL;
+	clkval = brcm_sdio_read_1(sc, BRCM_SDIO_FUNC1_CHIPCLKCSR);
 
 	if ((clkval & ~clkmask) != clkset) {
 		printf("%s: wrote 0x%02x read 0x%02x\n", DEVNAME(sc),
@@ -1020,8 +1020,8 @@ bwfm_sdio_buscore_prepare(struct bwfm_softc *bwfm)
 	}
 
 	for (i = 1000; i > 0; i--) {
-		clkval = bwfm_sdio_read_1(sc,
-		    BWFM_SDIO_FUNC1_CHIPCLKCSR);
+		clkval = brcm_sdio_read_1(sc,
+		    BRCM_SDIO_FUNC1_CHIPCLKCSR);
 		if (clkval & clkmask)
 			break;
 	}
@@ -1031,30 +1031,30 @@ bwfm_sdio_buscore_prepare(struct bwfm_softc *bwfm)
 		return 1;
 	}
 
-	clkset = BWFM_SDIO_FUNC1_CHIPCLKCSR_FORCE_HW_CLKREQ_OFF |
-	    BWFM_SDIO_FUNC1_CHIPCLKCSR_FORCE_ALP;
-	bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR, clkset);
+	clkset = BRCM_SDIO_FUNC1_CHIPCLKCSR_FORCE_HW_CLKREQ_OFF |
+	    BRCM_SDIO_FUNC1_CHIPCLKCSR_FORCE_ALP;
+	brcm_sdio_write_1(sc, BRCM_SDIO_FUNC1_CHIPCLKCSR, clkset);
 	delay(65);
 
-	bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_SDIOPULLUP, 0);
+	brcm_sdio_write_1(sc, BRCM_SDIO_FUNC1_SDIOPULLUP, 0);
 
 	return 0;
 }
 
 void
-bwfm_sdio_buscore_activate(struct bwfm_softc *bwfm, uint32_t rstvec)
+brcm_sdio_buscore_activate(struct brcm_softc *brcm, uint32_t rstvec)
 {
-	struct bwfm_sdio_softc *sc = (void *)bwfm;
+	struct brcm_sdio_softc *sc = (void *)brcm;
 
-	bwfm_sdio_dev_write(sc, BWFM_SDPCMD_INTSTATUS, 0xFFFFFFFF);
+	brcm_sdio_dev_write(sc, BRCM_SDPCMD_INTSTATUS, 0xFFFFFFFF);
 
 	if (rstvec)
-		bwfm_sdio_ram_read_write(sc, 0, (char *)&rstvec,
+		brcm_sdio_ram_read_write(sc, 0, (char *)&rstvec,
 		    sizeof(rstvec), 1);
 }
 
 struct mbuf *
-bwfm_sdio_newbuf(void)
+brcm_sdio_newbuf(void)
 {
 	struct mbuf *m;
 
@@ -1074,20 +1074,20 @@ bwfm_sdio_newbuf(void)
 }
 
 int
-bwfm_sdio_tx_ok(struct bwfm_sdio_softc *sc)
+brcm_sdio_tx_ok(struct brcm_sdio_softc *sc)
 {
 	return (uint8_t)(sc->sc_tx_max_seq - sc->sc_tx_seq) != 0 &&
 	    ((uint8_t)(sc->sc_tx_max_seq - sc->sc_tx_seq) & 0x80) == 0;
 }
 
 void
-bwfm_sdio_tx_frames(struct bwfm_sdio_softc *sc)
+brcm_sdio_tx_frames(struct brcm_sdio_softc *sc)
 {
 	struct ifnet *ifp = &sc->sc_sc.sc_ic.ic_if;
 	struct mbuf *m;
 	int i;
 
-	if (!bwfm_sdio_tx_ok(sc))
+	if (!brcm_sdio_tx_ok(sc))
 		return;
 
 	i = min((uint8_t)(sc->sc_tx_max_seq - sc->sc_tx_seq), 32);
@@ -1097,9 +1097,9 @@ bwfm_sdio_tx_frames(struct bwfm_sdio_softc *sc)
 			break;
 
 		if (m->m_type == MT_CONTROL)
-			bwfm_sdio_tx_ctrlframe(sc, m);
+			brcm_sdio_tx_ctrlframe(sc, m);
 		else
-			bwfm_sdio_tx_dataframe(sc, m);
+			brcm_sdio_tx_dataframe(sc, m);
 
 		m_freem(m);
 	}
@@ -1109,10 +1109,10 @@ bwfm_sdio_tx_frames(struct bwfm_sdio_softc *sc)
 }
 
 void
-bwfm_sdio_tx_ctrlframe(struct bwfm_sdio_softc *sc, struct mbuf *m)
+brcm_sdio_tx_ctrlframe(struct brcm_sdio_softc *sc, struct mbuf *m)
 {
-	struct bwfm_sdio_hwhdr *hwhdr;
-	struct bwfm_sdio_swhdr *swhdr;
+	struct brcm_sdio_hwhdr *hwhdr;
+	struct brcm_sdio_swhdr *swhdr;
 	size_t len, roundto;
 
 	len = sizeof(*hwhdr) + sizeof(*swhdr) + m->m_len;
@@ -1131,7 +1131,7 @@ bwfm_sdio_tx_ctrlframe(struct bwfm_sdio_softc *sc, struct mbuf *m)
 
 	swhdr = (void *)&hwhdr[1];
 	swhdr->seqnr = sc->sc_tx_seq++;
-	swhdr->chanflag = BWFM_SDIO_SWHDR_CHANNEL_CONTROL;
+	swhdr->chanflag = BRCM_SDIO_SWHDR_CHANNEL_CONTROL;
 	swhdr->nextlen = 0;
 	swhdr->dataoff = sizeof(*hwhdr) + sizeof(*swhdr);
 	swhdr->maxseqnr = 0;
@@ -1142,16 +1142,16 @@ bwfm_sdio_tx_ctrlframe(struct bwfm_sdio_softc *sc, struct mbuf *m)
 		memset(sc->sc_bounce_buf + len, 0,
 		    roundup(len, roundto) - len);
 
-	bwfm_sdio_frame_read_write(sc, sc->sc_bounce_buf,
+	brcm_sdio_frame_read_write(sc, sc->sc_bounce_buf,
 	    roundup(len, roundto), 1);
 }
 
 void
-bwfm_sdio_tx_dataframe(struct bwfm_sdio_softc *sc, struct mbuf *m)
+brcm_sdio_tx_dataframe(struct brcm_sdio_softc *sc, struct mbuf *m)
 {
-	struct bwfm_sdio_hwhdr *hwhdr;
-	struct bwfm_sdio_swhdr *swhdr;
-	struct bwfm_proto_bcdc_hdr *bcdc;
+	struct brcm_sdio_hwhdr *hwhdr;
+	struct brcm_sdio_swhdr *swhdr;
+	struct brcm_proto_bcdc_hdr *bcdc;
 	size_t len, roundto;
 
 	len = sizeof(*hwhdr) + sizeof(*swhdr) + sizeof(*bcdc)
@@ -1171,7 +1171,7 @@ bwfm_sdio_tx_dataframe(struct bwfm_sdio_softc *sc, struct mbuf *m)
 
 	swhdr = (void *)&hwhdr[1];
 	swhdr->seqnr = sc->sc_tx_seq++;
-	swhdr->chanflag = BWFM_SDIO_SWHDR_CHANNEL_DATA;
+	swhdr->chanflag = BRCM_SDIO_SWHDR_CHANNEL_DATA;
 	swhdr->nextlen = 0;
 	swhdr->dataoff = sizeof(*hwhdr) + sizeof(*swhdr);
 	swhdr->maxseqnr = 0;
@@ -1179,7 +1179,7 @@ bwfm_sdio_tx_dataframe(struct bwfm_sdio_softc *sc, struct mbuf *m)
 	bcdc = (void *)&swhdr[1];
 	bcdc->data_offset = 0;
 	bcdc->priority = ieee80211_classify(&sc->sc_sc.sc_ic, m);
-	bcdc->flags = BWFM_BCDC_FLAG_VER(BWFM_BCDC_FLAG_PROTO_VER);
+	bcdc->flags = BRCM_BCDC_FLAG_VER(BRCM_BCDC_FLAG_PROTO_VER);
 	bcdc->flags2 = 0;
 
 	m_copydata(m, 0, m->m_pkthdr.len, (caddr_t)&bcdc[1]);
@@ -1188,19 +1188,19 @@ bwfm_sdio_tx_dataframe(struct bwfm_sdio_softc *sc, struct mbuf *m)
 		memset(sc->sc_bounce_buf + len, 0,
 		    roundup(len, roundto) - len);
 
-	bwfm_sdio_frame_read_write(sc, sc->sc_bounce_buf,
+	brcm_sdio_frame_read_write(sc, sc->sc_bounce_buf,
 	    roundup(len, roundto), 1);
 
 	sc->sc_tx_count--;
 }
 
 void
-bwfm_sdio_rx_frames(struct bwfm_sdio_softc *sc)
+brcm_sdio_rx_frames(struct brcm_sdio_softc *sc)
 {
 	struct ifnet *ifp = &sc->sc_sc.sc_ic.ic_if;
 	struct mbuf_list ml = MBUF_LIST_INITIALIZER();
-	struct bwfm_sdio_hwhdr *hwhdr;
-	struct bwfm_sdio_swhdr *swhdr;
+	struct brcm_sdio_hwhdr *hwhdr;
+	struct brcm_sdio_swhdr *swhdr;
 	uint16_t *sublen, nextlen = 0;
 	struct mbuf *m;
 	size_t flen;
@@ -1208,18 +1208,18 @@ bwfm_sdio_rx_frames(struct bwfm_sdio_softc *sc)
 	off_t off;
 	int nsub;
 
-	hwhdr = (struct bwfm_sdio_hwhdr *)sc->sc_bounce_buf;
-	swhdr = (struct bwfm_sdio_swhdr *)&hwhdr[1];
+	hwhdr = (struct brcm_sdio_hwhdr *)sc->sc_bounce_buf;
+	swhdr = (struct brcm_sdio_swhdr *)&hwhdr[1];
 	data = (char *)&swhdr[1];
 
 	for (;;) {
 		/* If we know the next size, just read ahead. */
 		if (nextlen) {
-			if (bwfm_sdio_frame_read_write(sc, sc->sc_bounce_buf,
+			if (brcm_sdio_frame_read_write(sc, sc->sc_bounce_buf,
 			    nextlen, 0))
 				break;
 		} else {
-			if (bwfm_sdio_frame_read_write(sc, sc->sc_bounce_buf,
+			if (brcm_sdio_frame_read_write(sc, sc->sc_bounce_buf,
 			    sizeof(*hwhdr) + sizeof(*swhdr), 0))
 				break;
 		}
@@ -1257,7 +1257,7 @@ bwfm_sdio_rx_frames(struct bwfm_sdio_softc *sc)
 		if (!nextlen) {
 			KASSERT(roundup(flen, 4) <= sc->sc_bounce_size -
 			    (sizeof(*hwhdr) + sizeof(*swhdr)));
-			if (bwfm_sdio_frame_read_write(sc, data,
+			if (brcm_sdio_frame_read_write(sc, data,
 			    roundup(flen, 4), 0))
 				break;
 		}
@@ -1269,15 +1269,15 @@ bwfm_sdio_rx_frames(struct bwfm_sdio_softc *sc)
 		if (off > flen)
 			break;
 
-		switch (swhdr->chanflag & BWFM_SDIO_SWHDR_CHANNEL_MASK) {
-		case BWFM_SDIO_SWHDR_CHANNEL_CONTROL:
+		switch (swhdr->chanflag & BRCM_SDIO_SWHDR_CHANNEL_MASK) {
+		case BRCM_SDIO_SWHDR_CHANNEL_CONTROL:
 			sc->sc_sc.sc_proto_ops->proto_rxctl(&sc->sc_sc,
 			    data + off, flen - off);
 			nextlen = swhdr->nextlen << 4;
 			break;
-		case BWFM_SDIO_SWHDR_CHANNEL_EVENT:
-		case BWFM_SDIO_SWHDR_CHANNEL_DATA:
-			m = bwfm_sdio_newbuf();
+		case BRCM_SDIO_SWHDR_CHANNEL_EVENT:
+		case BRCM_SDIO_SWHDR_CHANNEL_DATA:
+			m = brcm_sdio_newbuf();
 			if (m == NULL)
 				break;
 			if (flen - off > m->m_len) {
@@ -1291,14 +1291,14 @@ bwfm_sdio_rx_frames(struct bwfm_sdio_softc *sc)
 			sc->sc_sc.sc_proto_ops->proto_rx(&sc->sc_sc, m, &ml);
 			nextlen = swhdr->nextlen << 4;
 			break;
-		case BWFM_SDIO_SWHDR_CHANNEL_GLOM:
+		case BRCM_SDIO_SWHDR_CHANNEL_GLOM:
 			if ((flen % sizeof(uint16_t)) != 0)
 				break;
 			nsub = flen / sizeof(uint16_t);
 			sublen = mallocarray(nsub, sizeof(uint16_t),
 			    M_DEVBUF, M_WAITOK | M_ZERO);
 			memcpy(sublen, data, nsub * sizeof(uint16_t));
-			bwfm_sdio_rx_glom(sc, sublen, nsub, &nextlen, &ml);
+			brcm_sdio_rx_glom(sc, sublen, nsub, &nextlen, &ml);
 			free(sublen, M_DEVBUF, nsub * sizeof(uint16_t));
 			break;
 		default:
@@ -1311,11 +1311,11 @@ bwfm_sdio_rx_frames(struct bwfm_sdio_softc *sc)
 }
 
 void
-bwfm_sdio_rx_glom(struct bwfm_sdio_softc *sc, uint16_t *sublen, int nsub,
+brcm_sdio_rx_glom(struct brcm_sdio_softc *sc, uint16_t *sublen, int nsub,
     uint16_t *nextlen, struct mbuf_list *ml)
 {
-	struct bwfm_sdio_hwhdr hwhdr;
-	struct bwfm_sdio_swhdr swhdr;
+	struct brcm_sdio_hwhdr hwhdr;
+	struct brcm_sdio_swhdr swhdr;
 	struct mbuf_list glom, drop;
 	struct mbuf *m;
 	size_t flen;
@@ -1329,7 +1329,7 @@ bwfm_sdio_rx_glom(struct bwfm_sdio_softc *sc, uint16_t *sublen, int nsub,
 		return;
 
 	for (i = 0; i < nsub; i++) {
-		m = bwfm_sdio_newbuf();
+		m = brcm_sdio_newbuf();
 		if (m == NULL) {
 			ml_purge(&glom);
 			return;
@@ -1339,7 +1339,7 @@ bwfm_sdio_rx_glom(struct bwfm_sdio_softc *sc, uint16_t *sublen, int nsub,
 			ml_purge(&glom);
 			return;
 		}
-		if (bwfm_sdio_frame_read_write(sc, mtod(m, char *),
+		if (brcm_sdio_frame_read_write(sc, mtod(m, char *),
 		    letoh16(sublen[i]), 0)) {
 			ml_purge(&glom);
 			return;
@@ -1353,8 +1353,8 @@ bwfm_sdio_rx_glom(struct bwfm_sdio_softc *sc, uint16_t *sublen, int nsub,
 		m_copydata(m, 0, sizeof(hwhdr), (caddr_t)&hwhdr);
 		m_copydata(m, sizeof(hwhdr), sizeof(swhdr), (caddr_t)&swhdr);
 		*nextlen = swhdr.nextlen << 4;
-		m_adj(m, sizeof(struct bwfm_sdio_hwhdr) +
-		    sizeof(struct bwfm_sdio_swhdr));
+		m_adj(m, sizeof(struct brcm_sdio_hwhdr) +
+		    sizeof(struct brcm_sdio_swhdr));
 	}
 
 	while ((m = ml_dequeue(&glom)) != NULL) {
@@ -1393,17 +1393,17 @@ bwfm_sdio_rx_glom(struct bwfm_sdio_softc *sc, uint16_t *sublen, int nsub,
 		if (off > flen)
 			goto drop;
 
-		switch (swhdr.chanflag & BWFM_SDIO_SWHDR_CHANNEL_MASK) {
-		case BWFM_SDIO_SWHDR_CHANNEL_CONTROL:
+		switch (swhdr.chanflag & BRCM_SDIO_SWHDR_CHANNEL_MASK) {
+		case BRCM_SDIO_SWHDR_CHANNEL_CONTROL:
 			printf("%s: control channel not allowed in glom\n",
 			    DEVNAME(sc));
 			goto drop;
-		case BWFM_SDIO_SWHDR_CHANNEL_EVENT:
-		case BWFM_SDIO_SWHDR_CHANNEL_DATA:
+		case BRCM_SDIO_SWHDR_CHANNEL_EVENT:
+		case BRCM_SDIO_SWHDR_CHANNEL_DATA:
 			m_adj(m, swhdr.dataoff);
 			sc->sc_sc.sc_proto_ops->proto_rx(&sc->sc_sc, m, ml);
 			break;
-		case BWFM_SDIO_SWHDR_CHANNEL_GLOM:
+		case BRCM_SDIO_SWHDR_CHANNEL_GLOM:
 			printf("%s: glom not allowed in glom\n",
 			    DEVNAME(sc));
 			goto drop;
@@ -1421,9 +1421,9 @@ drop:
 }
 
 int
-bwfm_sdio_txcheck(struct bwfm_softc *bwfm)
+brcm_sdio_txcheck(struct brcm_softc *brcm)
 {
-	struct bwfm_sdio_softc *sc = (void *)bwfm;
+	struct brcm_sdio_softc *sc = (void *)brcm;
 
 	if (sc->sc_tx_count >= 64)
 		return ENOBUFS;
@@ -1432,9 +1432,9 @@ bwfm_sdio_txcheck(struct bwfm_softc *bwfm)
 }
 
 int
-bwfm_sdio_txdata(struct bwfm_softc *bwfm, struct mbuf *m)
+brcm_sdio_txdata(struct brcm_softc *brcm, struct mbuf *m)
 {
-	struct bwfm_sdio_softc *sc = (void *)bwfm;
+	struct brcm_sdio_softc *sc = (void *)brcm;
 
 	if (sc->sc_tx_count >= 64)
 		return ENOBUFS;
@@ -1446,10 +1446,10 @@ bwfm_sdio_txdata(struct bwfm_softc *bwfm, struct mbuf *m)
 }
 
 int
-bwfm_sdio_txctl(struct bwfm_softc *bwfm, void *arg)
+brcm_sdio_txctl(struct brcm_softc *brcm, void *arg)
 {
-	struct bwfm_sdio_softc *sc = (void *)bwfm;
-	struct bwfm_proto_bcdc_ctl *ctl = arg;
+	struct brcm_sdio_softc *sc = (void *)brcm;
+	struct brcm_proto_bcdc_ctl *ctl = arg;
 	struct mbuf *m;
 
 	KASSERT(ctl->len <= MCLBYTES);
@@ -1478,18 +1478,18 @@ fail:
 	return 1;
 }
 
-#ifdef BWFM_DEBUG
+#ifdef BRCM_DEBUG
 void
-bwfm_sdio_debug_console(struct bwfm_sdio_softc *sc)
+brcm_sdio_debug_console(struct brcm_sdio_softc *sc)
 {
-	struct bwfm_sdio_console c;
+	struct brcm_sdio_console c;
 	uint32_t newidx;
 	int err;
 
 	if (!sc->sc_console_addr)
 		return;
 
-	err = bwfm_sdio_ram_read_write(sc, sc->sc_console_addr,
+	err = brcm_sdio_ram_read_write(sc, sc->sc_console_addr,
 	    (char *)&c, sizeof(c), 0);
 	if (err)
 		return;
@@ -1508,13 +1508,13 @@ bwfm_sdio_debug_console(struct bwfm_sdio_softc *sc)
 	if (newidx >= sc->sc_console_buf_size)
 		return;
 
-	err = bwfm_sdio_ram_read_write(sc, c.log_buf, sc->sc_console_buf,
+	err = brcm_sdio_ram_read_write(sc, c.log_buf, sc->sc_console_buf,
 	    sc->sc_console_buf_size, 0);
 	if (err)
 		return;
 
 	if (newidx != sc->sc_console_readidx)
-		DPRINTFN(3, ("BWFM CONSOLE: "));
+		DPRINTFN(3, ("BRCM CONSOLE: "));
 	while (newidx != sc->sc_console_readidx) {
 		uint8_t ch = sc->sc_console_buf[sc->sc_console_readidx];
 		sc->sc_console_readidx++;
